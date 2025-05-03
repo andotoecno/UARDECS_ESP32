@@ -1526,6 +1526,10 @@ void ClearMainBuffer()
 {
 	UECSbuffer[0] = '\0';
 	wp = 0;
+	for (int i = 0; i < BUF_SIZE; i++)
+	{
+		UECSbuffer[i] = 0;
+	}
 }
 //-----------------------------------
 void UDPAddPGMCharToBuffer(const char *_romword)
