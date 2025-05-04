@@ -1,0 +1,20 @@
+{
+  "name": "Uardecs_ESP32",
+  "description": "UECS protocol communication library via WiFi for ESP32",
+  "keywords": ["UECS", "WiFi", "ESP32"],
+  "authors": [
+    {
+      "email": "andotoecno@gmail.com",
+      "maintainer": true,
+      "name": "Yusaku Nakajima"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andotoecno/Uardecs_ESP32.git"
+  },
+  "version": "1.0.0",
+  "license": "LGPL-2.1",
+  "frameworks": ["arduino"],
+  "platforms": ["espressif32"]
+}
