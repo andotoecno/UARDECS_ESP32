@@ -12,3 +12,7 @@
 - ESP32ではEEPROMを使う際にEEPROM.begin()を呼ぶ必要があります。
 - これをUECSsetup内で実行しても良かったのですが、UECS以外でEEPROMを使う際に多重にEEPROM.begin()をすると意図しないアドレスを使う可能性があるので、あえてUECSの外で呼ぶようにしています。
 - ECSでは0x32~1024までを使っているので、UECS以外でEEPROMを利用する場合はそれよりも大きい範囲の確保やアドレスをかぶせないように注意してください。
+
+## ライセンス
+- [MITライセンス](https://opensource.org/licenses/MIT)に基づいています。
+- 詳細は[LICENSE](LICENSE)を参照してください。
