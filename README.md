@@ -11,9 +11,8 @@
 - ESP32のWiFi機能を使うため、WiFiのSSIDとパスワードを設定する必要があります。
 
 ## EPROM使用上の注意
-- UECSの外でEEPROM.begin()を呼ぶ必要があります。
-- UECSsetup内で実行すると、UECS以外でEEPROMを使う際に多重にEEPROM.begin()し意図しないアドレスを使う可能性があるので、あえてUECSの外で明示的に呼ぶ仕様にしています。
-- UECSのデフォルトでは0x32~1024までを使っています。UECS以外でEEPROMを利用する場合はアドレスをかぶせないように注意してください。
+- EEPROMは4k byte確保しています(元々のMega版のライブラリに合わせています)。
+- 最近のESP32はメモリが多いので、4k byteくらいは余裕だと思います。古いESP32を使う場合はヘッダファイルのEEPROMのアドレス定義を変更して使ってください。
 
 ## ライセンス
 - [MITライセンス](https://opensource.org/licenses/MIT)に基づいています。

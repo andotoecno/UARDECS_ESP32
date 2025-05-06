@@ -1673,6 +1673,8 @@ void UECSupdate16521port(UECSTEMPCCM *_tempCCM)
 
 void UECSsetup()
 {
+	EEPROM.begin(EEPROM_DATAEND);
+
 	UECSCheckProgramUpdate();
 	delay(3000);
 
