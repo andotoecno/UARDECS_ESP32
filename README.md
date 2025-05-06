@@ -1,12 +1,14 @@
-## 概要
+## Uardecs_ESP32
 - [UARDECS](https://uecs.org/arduino/uardecs.html)をESP32のWiFiで使えるように移植したライブラリです。使い方はUARDECSと同じです。
-- PlatformIO内でライブラリとして使うことを想定したリポジトリになっています
-- 実装の詳細は[README_dev.md](README_dev.md)を参照してください。
-- 2024/6/1時点で以下の動作確認済みです。
+- 本ブランチでは、試験的にArduino Mega版を移植しました
+  - Uno版と違い、CCMのAttributeとtypeをブラウザ上で設定できます。
+- PlatformIO内でライブラリとして使うことを想定したリポジトリになっています。実装の詳細は[README_dev.md](README_dev.md)を参照してください。
+- 以下の動作確認済みです。
     - ブラウザからノードの設定を見に行き、IPアドレス等を更新。
     - UECSパケット送受信支援ツールでUDPが来ているのを確認。
     - UECS-GEARでテストデータの受信を確認。(サンプルのデータ受信は、RoomEst1.iniを使って確認できます。)
-- MACアドレスの入力が必要なので、ESP32のWiFiのMACアドレス取得用スクリプトを別ファイルで追加しました(2023/5/28)
+    - UECS-pi, Arsprout Piでの受信確認。
+- ESP32のWiFi機能を使うため、WiFiのSSIDとパスワードを設定する必要があります。
 
 ## EPROM使用上の注意
 - UECSの外でEEPROM.begin()を呼ぶ必要があります。

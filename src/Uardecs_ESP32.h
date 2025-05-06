@@ -46,7 +46,7 @@ const char UECSccm_DATATYPE[] PROGMEM = "<DATA type=\""; //12 words
 const char UECSccm_ROOMTXT[] PROGMEM="\" room=\""; // 8 words
 const char UECSccm_REGIONTXT[] PROGMEM="\" region=\"";  // 10 words    
 const char UECSccm_ORDERTXT[] PROGMEM="\" order=\""; // 9 words
-const char UECSccm_PRIORITYTXT[] PROGMEM="\" priority=\""; //12 words 
+const char UECSCCM_PRIOTXT[] PROGMEM="\" priority=\""; //12 words 
 const char UECSccm_CLOSETAG[] PROGMEM="\">";
 const char UECSccm_IPTAG[] PROGMEM="</DATA><IP>"; // 11 words
 const char UECSccm_FOOTER0[] PROGMEM="</UECS>"; // 12 words
@@ -91,6 +91,14 @@ const char UECSccm_SR[] PROGMEM="\" SR=\""; // 6 words
 const char UECSccm_LV[] PROGMEM="\" LV=\""; // 6 words
 const char UECSccm_CCMRESCLOSE[] PROGMEM="</CCM></UECS>";
 
+const char UECSccm_CCMSEARCH[] PROGMEM = "<SEARCH type=\"";  // 14 words
+const char UECSccm_CCMSEARCH_ROOM[] PROGMEM 	= "room=\"";  // 7 words
+const char UECSccm_CCMSEARCH_REGION[] PROGMEM 	= "region=\"";  // 9 words
+const char UECSccm_CCMSEARCH_ORDER[] PROGMEM 	= "order=\"";  // 8 words
+
+const char UECSccm_CCMSERVER[] PROGMEM = "<SERVER type=\"";
+const char UECSccm_CCMSERVERCLOSE[] PROGMEM = "</SERVER></UECS>";  // 9 words
+
 
   
 /********************************/
@@ -106,9 +114,9 @@ struct UECSOriginalAttribute {
   byte dns[4];
 
   byte mac[6];
-  unsigned short room;
-  unsigned short region;
-  unsigned short order;
+  // unsigned short room;
+  // unsigned short region;
+  // unsigned short order;
 
   unsigned char flags;
   unsigned char status;
@@ -124,6 +132,7 @@ struct UECSOriginalAttribute {
 #define STATUS_SAFEMODE				1		//safemode jumper was enabled when startup
 #define STATUS_MEMORY_LEAK			2		//Memory leak alert
 #define STATUS_NEEDRESET			4		//Please push reset button
+#define STATUS_PROGRAMUPDATE		8		//new program loaded
 
 #define STATUS_SAFEMODE_MASK		254		//safemode Release
 
@@ -131,22 +140,23 @@ struct UECSOriginalAttribute {
 /* CCM    ***********************/
 /********************************/
 struct UECSCCM{
-  boolean sender;              // fix
-  const char * name;    // fix
-  const char * type;    // fix 
-  const char * unit;    // fix
-  unsigned char decimal;       // fix   
-  char ccmLevel;        // A_1S_0 etc. fix
-  signed short attribute[4];
-  signed short baseAttribute[3];
-  signed long value;
-//  signed long old_value;
-  boolean validity;
-  unsigned long recmillis;
-  IPAddress address;
-  boolean flagStimeRfirst;
-  unsigned char flags;
-};
+    boolean sender;              // fix
+    const char * name;    // fix
+    const char * type;    // dafault Type
+    const char * unit;    // fix
+    char typeStr[20];		// user edit Type
+    unsigned char decimal;       // fix   
+    char ccmLevel;        // A_1S_0 etc. fix
+    signed short attribute[4];
+    signed short baseAttribute[4];
+    signed long value;
+    signed long old_value;
+    boolean validity;
+    unsigned long recmillis;
+    IPAddress address;
+    boolean flagStimeRfirst;
+    unsigned char flags;
+  };
 
 
 /********************************/
@@ -156,7 +166,7 @@ struct UECSTEMPCCM{
   char type[MAX_TYPE_CHAR];     
   unsigned char decimal;       // fix   
   signed short attribute[4];
-  signed short baseAttribute[3];
+  signed short baseAttribute[4];
   signed long value;
   IPAddress address;
 };
@@ -166,6 +176,9 @@ void UECSCreateCCMPacketAndSend(struct UECSCCM* _ccm);
 void UECSupRecCCM(UECSCCM* _ccm, UECSTEMPCCM* _ccmRec);
 void UECScheckUpDate(UECSTEMPCCM* _tempCCM, unsigned long _time,int startid);
 boolean UECSresNodeScan();
+boolean UECSresCCMSearchAndSend(UECSTEMPCCM* _tempCCM);
+boolean UECSCCMSimpleHitcheck(int ccmid,short room,short region,short order);
+
 void UECSautomaticSendManager();
 void UECSautomaticValidManager(unsigned long td);
 
@@ -189,24 +202,39 @@ void UECSautomaticValidManager(unsigned long td);
 #define S_1M_0 7
 #define B_0 8
 #define B_1 9
+
+const char LastUpdate[] PROGMEM="<BR>Last update:";
+const char ProgramDate[] PROGMEM=__DATE__;
+const char ProgramTime[] PROGMEM=__TIME__;
 	
 #define BUF_SIZE 300
 #define BUF_HTTP_REFRESH_SIZE 279  //BUF_SIZE-(MAX_TYPE_CHAR+1)
-
 //EEPROM 1k
-	#define EEPROM_OFFSET_DATATOP	800
-	#define EEPROM_OFFSET_IP		800
-	#define EEPROM_OFFSET_SUBNET	804
-	#define EEPROM_OFFSET_GATEWAY	808
-	#define EEPROM_OFFSET_DNS		812
-	#define EEPROM_OFFSET_ROOM		816
-	#define EEPROM_OFFSET_REGION	817
-	#define EEPROM_OFFSET_ORDER_L	818
-	#define EEPROM_OFFSET_ORDER_H	819
-	#define EEPROM_OFFSET_NODENAME	825
-	#define EEPROM_OFFSET_WEBDATA	850
-	#define EEPROM_OFFSET_DATAEND	1023
+#define EEPROM_PROGRAMDATETIME	326
+#define EEPROM_CCMTOP	350
+#define EEPROM_CCMEND	799
+#define EEPROM_DATATOP	800
+#define EEPROM_IP		800
+#define EEPROM_SUBNET	804
+#define EEPROM_GATEWAY	808
+#define EEPROM_DNS		812
+#define EEPROM_ROOM		816
+#define EEPROM_REGION	817
+#define EEPROM_ORDER_L	818
+#define EEPROM_ORDER_H	819
+#define EEPROM_NODENAME	825
+#define EEPROM_WEBDATA	850
+#define EEPROM_DATAEND	1023
 
+#define EEPROM_L_CCM_TYPETXT	0
+#define EEPROM_L_CCM_ROOM		21
+#define EEPROM_L_CCM_REGI		22
+#define EEPROM_L_CCM_ORDE_L		23
+#define EEPROM_L_CCM_ORDE_H		24
+#define EEPROM_L_CCM_PRIO		25
+#define EEPROM_L_CCM_RESERV		26
+#define EEPROM_L_CCM_END		29
+#define EEPROM_L_CCM_TOTAL		30
 
 
 const char UECShttpHead200_OK[] PROGMEM="HTTP/1.1 200 OK\r\n";
@@ -218,17 +246,18 @@ const char UECShttpHeadConnectionKeepAlive[] PROGMEM = "Connection: keep-alive\r
 
 const char UECShtmlTABLECLOSE[] PROGMEM="</TBODY></TABLE>"; // 16 words
 const char UECShtmlRETURNINDEX[] PROGMEM="<P align=\"center\">return<A href=\".\">Top</A></P>";
+const char UECShtmlRETURNP1[] PROGMEM="<P align=\"center\">return<A href=\"./1\">CCM</A></P>";
 const char UECSbtrag[] PROGMEM = "<br>";
-const char UECShtmlLAN2[] PROGMEM = "<form action=\"./2\"><p>"; // 37words
+const char UECShtmlLAN2[] PROGMEM = "<form action=\"./2\"><p>"; 
 const char UECShtmlLAN3A[] PROGMEM ="address:"; //9 words
 const char UECShtmlLAN3B[] PROGMEM ="subnet:";
 const char UECShtmlLAN3C[] PROGMEM ="gateway:";
 const char UECShtmlLAN3D[] PROGMEM ="dns:";
 const char UECShtmlLAN3E[] PROGMEM ="mac:";
-const char UECShtmlRoom[] PROGMEM ="room:"; //8 words
-const char UECShtmlRegion[] PROGMEM ="region:";
-const char UECShtmlOrder[] PROGMEM ="order:";
-const char UECShtmlUECSID[] PROGMEM ="uecsid:";
+//const char UECShtmlRoom[] PROGMEM ="room:"; 
+//const char UECShtmlRegion[] PROGMEM ="region:";
+//const char UECShtmlOrder[] PROGMEM ="order:";
+const char UECShtmlUECSID[] PROGMEM ="<BR>uecsid:";
 const char UECShtmlLANTITLE[] PROGMEM = "LAN";
 const char UECShtmlUECSTITLE[] PROGMEM = "UECS";
 const char UECShtmlNAMETITLE[] PROGMEM = "Node Name";
@@ -243,9 +272,15 @@ const char UECShtmlINPUTCLOSE3[] PROGMEM = "\" size=\"3\">";
 const char UECShtmlINPUTCLOSE19[] PROGMEM = "\" size=\"19\">";
 const char UECShtmlSUBMIT[] PROGMEM = "<input type=\"submit\" value=\"send\" name=\"S\">";
 
+
 const char UECShtmlHEADER[] PROGMEM="<!DOCTYPE html><HTML><HEAD><META http-equiv=\"";
 const char UECShtmlNORMAL[] PROGMEM    ="Content-Type\" content=\"text/html; charset=utf-8\"><TITLE>";
-const char UECShtmlREDIRECT[] PROGMEM   ="refresh\" content=\"0;URL=./1\"></HEAD></HTML>";
+const char UECShtmlREDIRECT1[] PROGMEM   ="refresh\" content=\"0;URL=./1\"></HEAD></HTML>";
+const char UECShtmlREDIRECT3[] PROGMEM   ="refresh\" content=\"0;URL=./3?L=0\"></HEAD></HTML>";
+//const char UECShtmlREDIRECTresetStart[] PROGMEM   ="refresh\" content=\"10;URL=";
+//const char UECShtmlREDIRECTresetEnd[] PROGMEM   ="/2\"></HEAD><BODY>Rebooting...</BODY></HTML>";
+
+
 
 const char UECShtmlTITLECLOSE[] PROGMEM="</TITLE>";
 const char UECShtml1A[] PROGMEM="</HEAD><BODY><CENTER><H1>";
@@ -263,15 +298,32 @@ const char UECSformend[] PROGMEM = "</form>";
 const char UECSpageFavicon[] PROGMEM = "GET/favicon.icoHTTP/1.1";
 const char UECSpageError[] PROGMEM = "Error!";
 
-const char UECShtmlIndex[] PROGMEM = "<a href=\"./1\">Node Status</a><br><br><a href=\"./2\">Network Config</a><br>";
+const char UECShtmlIndex[] PROGMEM = "<a href=\"./1\">Node Status</a><br><br><a href=\"./3?L=0\">CCM Edit</a><br><br><a href=\"./2\">Network Config</a><br>";
 
 const char UECShtmlUserRes0[] PROGMEM="<H2>Status & SetValue</H2><form action=\"./1\"><TABLE border=\"1\"><TBODY align=\"center\"><TR><TH>Name</TH><TH>Val</TH><TH>Unit</TH><TH>Detail</TH></TR>";
-const char UECShtmlInputHidden[] PROGMEM = "<INPUT type=\"hidden\" name=\"L\" value=\"0\"/>";
+const char UECShtmlInputHidden0[] PROGMEM = "<INPUT type=\"hidden\" name=\"L\" value=\"0\"/>";
+const char UECShtmlInputHiddenValue[] PROGMEM = "<INPUT type=\"hidden\" name=\"L\" value=\"";
+
 	
 const char UECShtmlSelect[] PROGMEM =  "<Select name=\"L\">";
 const char UECShtmlOption[] PROGMEM = "<Option value=\"";
 const char UECShtmlSelectEnd[] PROGMEM = "</SELECT>";
 
+const char UECShtmlEditCCMTableHeader[] PROGMEM = "</H1><H2>CCM Edit</H2><form action=\"./3\"><TABLE border=\"1\"><TBODY align=\"center\"><TR><TH>Info</TH><TH>S/R</TH><TH>SR Lev</TH><TH>Unit</TH><TH>Room-Region-Order-Priority</TH><TH>Type</TH><TH>Default</TH></TR>";
+const char UECShtmlEditCCMEditTxt[] PROGMEM ="Edit";
+
+
+const char UECShtmlEditCCMCmdBtn1[] PROGMEM ="<br><form><input type=\"button\" value=\"Reset all type\" onClick=\"f(1)\"> <input type=\"button\" value=\"Copy attributes to all:";
+const char UECShtmlEditCCMCmdBtn2[] PROGMEM ="\" onClick=\"f(2)\"></form>";
+const char UECShtmlEditCCMCmdBtnScript1[] PROGMEM="<script type=\"text/javascript\">function f(n){if(n==1){m=\"Reset all type to default?\";l=\"./3?L=999\";}else{m=\"Fill attributes to same?\";l=\"./3?L=";
+const char UECShtmlEditCCMCmdBtnScript2[] PROGMEM="\";}r=confirm(m);if(r){location.href=l;}}</script>";
+
+
+
+//const char UECSaccess_NOSPC_GETP4[] PROGMEM = "GET/4";
+//const char UECSaccess_NOSPC_GETP5A[] PROGMEM = "GET/5?L=";
+const char UECSaccess_NOSPC_GETP3[] PROGMEM = "GET/3";
+const char UECSaccess_NOSPC_GETP3A[] PROGMEM = "GET/3?L=";
 const char UECSaccess_NOSPC_GETP0[] PROGMEM = "GET/HTTP/1.1";
 const char UECSaccess_NOSPC_GETP1[] PROGMEM = "GET/1HTTP/1.1";
 const char UECSaccess_NOSPC_GETP1A[] PROGMEM = "GET/1?L=";
@@ -280,6 +332,8 @@ const char UECSaccess_NOSPC_GETP2A[] PROGMEM = "GET/2?L=";
 const char UECSaccess_LEQUAL[] PROGMEM = "L=";
 
 
+//const char UECSAHREF3[] PROGMEM = "<a href=\"./3\">";
+const char UECSAHREF3[] PROGMEM = "<a href=\"./3?L=";
 const char UECSAHREF[] PROGMEM = "<a href=\"http://";
 const char UECSTagClose[] PROGMEM = "\">";
 const char UECSSlashTagClose[] PROGMEM = "\"/>";
@@ -291,8 +345,9 @@ const char UECSTxtPartS[] PROGMEM = "S";
 const char UECSTxtPartColon[] PROGMEM = ":";
 const char UECSTxtPartOK[] PROGMEM = "OK";
 const char UECSTxtPartHyphen[] PROGMEM = "-";
+//const char UECSTxtPartStop[] PROGMEM = "!";
+//const char UECSTxtPartSend[] PROGMEM = "o";
 const char UECSTxtPartSelected[] PROGMEM = "\" selected>";
-
 
 
 struct UECSUserHtml{
@@ -316,7 +371,11 @@ void UECSStartServer();
 void SoftReset(void);
 
 void UECS_EEPROM_writeLong(int ee, long value);
+void UECS_EEPROM_writeChar(int ee, char value);
+void UECS_EEPROM_writeByte(int ee, uint8_t value);
 long UECS_EEPROM_readLong(int ee);
+char UECS_EEPROM_readChar(int ee);
+uint8_t UECS_EEPROM_readByte(int ee);
 void HTTPcheckRequest();
 void HTTPPrintHeader();
 void HTTPsendPageIndex();
@@ -328,6 +387,7 @@ void HTTPGetFormDataLANSettingPage();
 
 void UECSupdate16520portReceive(UECSTEMPCCM* _tempCCM, unsigned long _millis);
 void UECSupdate16529port(UECSTEMPCCM* _tempCCM);
+void UECSupdate16521port(UECSTEMPCCM* _tempCCM);
 void UECSsetup();
 void UECSloop();
 
@@ -427,6 +487,10 @@ void HTTPsetInput(short _value);
 void MemoryWatching(void);
 
 bool ChangeWebValue(signed long* data,signed long value);
+void UECSCheckProgramUpdate(void);
 
+void UECS_EEPROM_SaveCCMType(int ccmid);
+void UECS_EEPROM_SaveCCMAttribute(int ccmid);
+void UECS_EEPROM_LoadCCMSetting(int ccmid);
 
 #endif

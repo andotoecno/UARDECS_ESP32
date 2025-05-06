@@ -4,6 +4,7 @@ char UECSbuffer[BUF_SIZE];		   // main buffer
 char UECStempStr20[MAX_TYPE_CHAR]; // sub buffer
 AsyncUDP UECS_UDP16520;
 AsyncUDP UECS_UDP16529;
+AsyncUDP UECS_UDP16521;
 WiFiServer UECSlogserver(80);
 WiFiClient UECSclient;
 
@@ -22,7 +23,7 @@ const char *UECSattrChar[] = {
 	UECSccm_ROOMTXT,
 	UECSccm_REGIONTXT,
 	UECSccm_ORDERTXT,
-	UECSccm_PRIORITYTXT,
+	UECSCCM_PRIOTXT,
 };
 const char *UECSCCMLEVEL[] = {
 	UECS_A1S0,
@@ -197,7 +198,7 @@ void UECSCreateCCMPacketAndSend(struct UECSCCM *_ccm)
 	UDPAddPGMCharToBuffer(&(UECSccm_XMLHEADER[0]));
 	UDPAddPGMCharToBuffer(&(UECSccm_UECSVER_E10[0]));
 	UDPAddPGMCharToBuffer(&(UECSccm_DATATYPE[0]));
-	UDPAddPGMCharToBuffer(_ccm->type);
+	UDPAddCharToBuffer(_ccm->typeStr);
 
 	for (int i = 0; i < 3; i++)
 	{
@@ -278,16 +279,7 @@ void UECScheckUpDate(UECSTEMPCCM *_tempCCM, unsigned long _time, int startid)
 		}
 
 		// type
-		strcpy_P(UECStempStr20, U_ccmList[i].type);
-
-		/*
-		if(U_orgAttribute.flags&ATTRFLAG_ALLOW_ABRIDGE_TYPE)
-			{
-			strtok(UECStempStr20,".");
-			strtok(_tempCCM->type,".");
-			}
-			*/
-		if (strcmp(UECStempStr20, _tempCCM->type) != 0)
+		if (strcmp(U_ccmList[i].typeStr, _tempCCM->type) != 0)
 		{
 			continue;
 		}
@@ -506,6 +498,15 @@ boolean UECSresNodeScan()
 //------------------------------------------------------------------
 void UECSautomaticSendManager()
 {
+	/*
+	UDP transmission load balancing
+	Improved UDP send timing not to be concentrated in Ver2.0 or later.
+	Packets sent at 10-second and 60-second intervals were sent together in past versions, but are sent separately in the new version.
+	Transmission timing is distributed according to the order of registration of the lower one of the IP addresses and the CCM.
+	However, this load balancing is ineffective for packets sent every second.
+	*/
+	int timing_count;
+
 	for (int id = 0; id < U_MAX_CCM; id++)
 	{
 		if (U_ccmList[id].ccmLevel == NONE || !U_ccmList[id].sender)
@@ -513,15 +514,47 @@ void UECSautomaticSendManager()
 			continue;
 		}
 
-		if (U_ccmList[id].ccmLevel == A_1S_0 || U_ccmList[id].ccmLevel == A_1S_1 || U_ccmList[id].ccmLevel == S_1S_0)
+		// Timeout judgment of the sending CCM
+		if (U_ccmList[id].flagStimeRfirst == true)
+		{
+			U_ccmList[id].recmillis = 0;
+			U_ccmList[id].validity = true;
+		}
+		else
+		{
+			if ((U_ccmList[id].ccmLevel == A_1S_0 || U_ccmList[id].ccmLevel == A_1S_1) && U_ccmList[id].recmillis > 1000)
+			{
+				U_ccmList[id].validity = false;
+			}
+			else if ((U_ccmList[id].ccmLevel == A_10S_0 || U_ccmList[id].ccmLevel == A_10S_1) && U_ccmList[id].recmillis > 10000)
+			{
+				U_ccmList[id].validity = false;
+			}
+			else if ((U_ccmList[id].ccmLevel == A_1M_0 || U_ccmList[id].ccmLevel == A_1M_1) && U_ccmList[id].recmillis > 60000)
+			{
+				U_ccmList[id].validity = false;
+			}
+		}
+		if (U_ccmList[id].recmillis < 36000000)
+		{
+			U_ccmList[id].recmillis += 1000;
+		}
+
+		// Determination of CCM transmission timing
+		timing_count = U_orgAttribute.ip[3] + id;
+		if ((U_ccmList[id].ccmLevel == A_10S_1 || U_ccmList[id].ccmLevel == A_1M_1) && U_ccmList[id].old_value != U_ccmList[id].value)
 		{
 			U_ccmList[id].flagStimeRfirst = true;
 		}
-		else if ((UECSsyscounter60s % 10 == id % 10) && (U_ccmList[id].ccmLevel == A_10S_0 || U_ccmList[id].ccmLevel == A_10S_1))
+		else if (U_ccmList[id].ccmLevel == A_1S_0 || U_ccmList[id].ccmLevel == A_1S_1 || U_ccmList[id].ccmLevel == S_1S_0)
 		{
 			U_ccmList[id].flagStimeRfirst = true;
 		}
-		else if (UECSsyscounter60s == id % 10 && (U_ccmList[id].ccmLevel == A_1M_0 || U_ccmList[id].ccmLevel == A_1M_1 || U_ccmList[id].ccmLevel == S_1M_0))
+		else if ((UECSsyscounter60s % 10 == (timing_count % 10)) && (U_ccmList[id].ccmLevel == A_10S_0 || U_ccmList[id].ccmLevel == A_10S_1))
+		{
+			U_ccmList[id].flagStimeRfirst = true;
+		}
+		else if (UECSsyscounter60s == (timing_count % 60) && (U_ccmList[id].ccmLevel == A_1M_0 || U_ccmList[id].ccmLevel == A_1M_1 || U_ccmList[id].ccmLevel == S_1M_0))
 		{
 			U_ccmList[id].flagStimeRfirst = true;
 		}
@@ -529,6 +562,7 @@ void UECSautomaticSendManager()
 		{
 			U_ccmList[id].flagStimeRfirst = false;
 		}
+		U_ccmList[id].old_value = U_ccmList[id].value;
 	}
 }
 //----------------------------------------------------------------------
@@ -571,6 +605,23 @@ void UECSautomaticValidManager(unsigned long td)
 
 // ##############################################################################
 // ##############################################################################
+void UECS_EEPROM_writeByte(int ee, uint8_t value)
+{
+	if (EEPROM.read(ee) != (uint8_t)value) // skip same value
+	{
+		EEPROM.write(ee, (uint8_t)value);
+		EEPROM.commit(); // Commit immediately after a change for a single byte
+	}
+}
+
+void UECS_EEPROM_writeChar(int ee, char value)
+{
+	if (EEPROM.read(ee) != value) // skip same value
+	{
+		EEPROM.write(ee, value);
+		EEPROM.commit(); // Commit immediately after a change for a single char
+	}
+}
 
 void UECS_EEPROM_writeLong(int ee, long value)
 {
@@ -593,6 +644,16 @@ void UECS_EEPROM_writeLong(int ee, long value)
 	}
 }
 
+uint8_t UECS_EEPROM_readByte(int ee)
+{
+	return (uint8_t)EEPROM.read(ee);
+}
+
+char UECS_EEPROM_readChar(int ee)
+{
+	return (char)EEPROM.read(ee);
+}
+
 long UECS_EEPROM_readLong(int ee)
 {
 	long value = 0;
@@ -601,6 +662,8 @@ long UECS_EEPROM_readLong(int ee)
 		*p++ = EEPROM.read(ee++);
 	return value;
 }
+
+
 //-----------------------------------------------------------new
 void HTTPsetInput(short _value)
 {
@@ -621,14 +684,22 @@ void HTTPprintIPtoHtml(byte address[])
 }
 //-----------------------------------------------------------new
 //---------------------------------------------------------------
-void HTTPPrintRedirectP1()
+void HTTPPrintRedirect(char page)
 {
 	ClearMainBuffer();
 	HTTPAddPGMCharToBuffer(&(UECShttpHead200_OK[0]));
 	HTTPAddPGMCharToBuffer(&(UECShttpHeadContentType[0]));
 	HTTPAddPGMCharToBuffer(&(UECShttpHeadConnection[0]));
 	HTTPAddPGMCharToBuffer(&(UECShtmlHEADER[0]));
-	HTTPAddPGMCharToBuffer(&(UECShtmlREDIRECT[0]));
+	if (page == 3)
+	{
+		HTTPAddPGMCharToBuffer(&(UECShtmlREDIRECT3[0]));
+	}
+	else
+	{
+		HTTPAddPGMCharToBuffer(&(UECShtmlREDIRECT1[0]));
+	}
+
 	HTTPCloseBuffer();
 }
 //-----------------------------------------------------------
@@ -662,7 +733,6 @@ void HTTPPrintHeader()
 //-----------------------------------------------------------
 void HTTPsendFaviconResponse()
 {
-	Serial.println(F("----------Favicon GET Request Received"));
 	ClearMainBuffer();
 	HTTPAddPGMCharToBuffer(&(UECShttpHead404_NotFound[0]));
 	HTTPAddPGMCharToBuffer(&(UECShttpHeadConnectionKeepAlive[0]));
@@ -687,6 +757,12 @@ void HTTPsendPageIndex()
 	HTTPAddPGMCharToBuffer(&(UECShtmlIndex[0]));
 	HTTPAddPGMCharToBuffer(&(UECShtmlHR[0]));
 	HTTPAddPGMCharToBuffer(&(U_footnote[0]));
+
+	HTTPAddPGMCharToBuffer(&(LastUpdate[0]));
+	HTTPAddPGMCharToBuffer(&(ProgramDate[0]));
+	HTTPAddPGMCharToBuffer(&(UECSTxtPartHyphen[0]));
+	HTTPAddPGMCharToBuffer(&(ProgramTime[0]));
+
 	HTTPAddPGMCharToBuffer(&(UECShtmlHTMLCLOSE[0]));
 	HTTPCloseBuffer();
 }
@@ -723,17 +799,17 @@ void HTTPsendPageLANSetting()
 	sprintf(UECStempStr20, "%02X%02X%02X%02X%02X%02X", U_orgAttribute.mac[0], U_orgAttribute.mac[1], U_orgAttribute.mac[2], U_orgAttribute.mac[3], U_orgAttribute.mac[4], U_orgAttribute.mac[5]);
 	UDPAddCharToBuffer(UECStempStr20);
 
-	HTTPAddPGMCharToBuffer(UECShtmlH2TAG);	   // <H2>
-	HTTPAddPGMCharToBuffer(UECShtmlUECSTITLE); // UECS
-	HTTPAddPGMCharToBuffer(UECShtmlH2CLOSE);   // </H2>
+	// HTTPAddPGMCharToBuffer(UECShtmlH2TAG);	   // <H2>
+	// HTTPAddPGMCharToBuffer(UECShtmlUECSTITLE); // UECS
+	// HTTPAddPGMCharToBuffer(UECShtmlH2CLOSE);   // </H2>
 
-	HTTPAddPGMCharToBuffer(UECShtmlRoom);
-	HTTPsetInput(U_orgAttribute.room);
-	HTTPAddPGMCharToBuffer(UECShtmlRegion);
-	HTTPsetInput(U_orgAttribute.region);
-	HTTPAddPGMCharToBuffer(UECShtmlOrder);
-	HTTPsetInput(U_orgAttribute.order);
-	HTTPAddPGMCharToBuffer(&(UECSbtrag[0]));
+	// HTTPAddPGMCharToBuffer(UECShtmlRoom);
+	// HTTPsetInput(U_orgAttribute.room);
+	// HTTPAddPGMCharToBuffer(UECShtmlRegion);
+	// HTTPsetInput(U_orgAttribute.region);
+	// HTTPAddPGMCharToBuffer(UECShtmlOrder);
+	// HTTPsetInput(U_orgAttribute.order);
+	// HTTPAddPGMCharToBuffer(&(UECSbtrag[0]));
 
 	HTTPAddPGMCharToBuffer(&(UECShtmlUECSID[0])); // uecsid:
 	UDPAddPGMCharToBuffer(&(U_uecsid[0]));
@@ -874,7 +950,7 @@ void HTTPsendPageCCM()
 					sprintf(UECStempStr20, "%ld", *(U_html[i].data));
 				}
 				HTTPAddCharToBuffer(UECStempStr20);
-				HTTPAddPGMCharToBuffer(&(UECShtmlInputHidden[0]));
+				HTTPAddPGMCharToBuffer(&(UECShtmlInputHidden0[0]));
 			}
 			else if (U_html[i].pattern == UECSINPUTDATA)
 			{
@@ -909,7 +985,7 @@ void HTTPsendPageCCM()
 			else if (U_html[i].pattern == UECSSHOWSTRING)
 			{
 				HTTPAddPGMCharToBuffer(U_html[i].selectname[(int)*(U_html[i].data)]); //************
-				HTTPAddPGMCharToBuffer(&(UECShtmlInputHidden[0]));
+				HTTPAddPGMCharToBuffer(&(UECShtmlInputHidden0[0]));
 			}
 
 			HTTPAddPGMCharToBuffer(&(UECStdtd[0]));
@@ -924,6 +1000,131 @@ void HTTPsendPageCCM()
 		HTTPAddPGMCharToBuffer(&(UECSformend[0]));		  //</form>
 	}
 	HTTPAddPGMCharToBuffer(&(UECShtmlRETURNINDEX[0])); //<P align=\"center\">return <A href=\"index.htm\">Top</A></P>
+	HTTPAddPGMCharToBuffer(&(UECShtmlHTMLCLOSE[0]));
+
+	HTTPCloseBuffer();
+}
+
+void HTTPsendPageEDITCCM(int ccmid)
+{
+
+	HTTPPrintHeader();
+	HTTPAddCharToBuffer(U_nodename);
+
+	HTTPAddPGMCharToBuffer(&(UECShtmlEditCCMTableHeader[0]));
+
+	//----------
+	for (int i = 0; i < U_MAX_CCM; i++)
+	{
+		// if(U_ccmList[i].ccmLevel != NONE)
+
+		HTTPAddPGMCharToBuffer(&(UECStrtd[0])); //<tr><td>
+
+		// table 2nd start
+		//	HTTPAddPGMCharToBuffer(&(UECStdtd[0]));
+		// ccm name
+		HTTPAddPGMCharToBuffer(U_ccmList[i].name);
+		HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
+												// SR
+		if (U_ccmList[i].sender)
+		{
+			HTTPAddPGMCharToBuffer(UECSTxtPartS);
+		}
+		else
+		{
+			HTTPAddPGMCharToBuffer(UECSTxtPartR);
+		}
+		// level
+		HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
+		HTTPAddPGMCharToBuffer((UECSCCMLEVEL[U_ccmList[i].ccmLevel]));
+
+		// unit
+		HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
+		HTTPAddPGMCharToBuffer(U_ccmList[i].unit);
+		HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
+
+		if (i == ccmid && U_ccmList[i].ccmLevel != NONE)
+		{
+			HTTPAddPGMCharToBuffer(&(UECShtmlInputHiddenValue[0])); // hidden value(ccmid)
+			sprintf(UECStempStr20, "%d", i);
+			HTTPAddCharToBuffer(UECStempStr20);
+			HTTPAddPGMCharToBuffer(&(UECSSlashTagClose[0]));
+
+			// room region order
+			HTTPAddPGMCharToBuffer(&(UECShtmlInputText[0]));
+			sprintf(UECStempStr20, "%d", U_ccmList[i].baseAttribute[AT_ROOM]);
+			HTTPAddCharToBuffer(UECStempStr20);
+			HTTPAddPGMCharToBuffer(UECShtmlINPUTCLOSE3);
+
+			HTTPAddPGMCharToBuffer(&(UECShtmlInputText[0]));
+			sprintf(UECStempStr20, "%d", U_ccmList[i].baseAttribute[AT_REGI]);
+			HTTPAddCharToBuffer(UECStempStr20);
+			HTTPAddPGMCharToBuffer(UECShtmlINPUTCLOSE3);
+
+			HTTPAddPGMCharToBuffer(&(UECShtmlInputText[0]));
+			sprintf(UECStempStr20, "%d", U_ccmList[i].baseAttribute[AT_ORDE]);
+			HTTPAddCharToBuffer(UECStempStr20);
+			HTTPAddPGMCharToBuffer(UECShtmlINPUTCLOSE3);
+
+			// priority
+			HTTPAddPGMCharToBuffer(&(UECShtmlInputText[0]));
+			sprintf(UECStempStr20, "%d", U_ccmList[i].baseAttribute[AT_PRIO]);
+			HTTPAddCharToBuffer(UECStempStr20);
+			HTTPAddPGMCharToBuffer(UECShtmlINPUTCLOSE3);
+			HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
+
+			// TypeInput
+			HTTPAddPGMCharToBuffer(&(UECShtmlInputText[0]));
+			HTTPAddCharToBuffer(U_ccmList[i].typeStr);
+			HTTPAddPGMCharToBuffer(UECShtmlINPUTCLOSE19);
+
+			HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
+			// default
+			HTTPAddPGMCharToBuffer(U_ccmList[i].type);
+
+			HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
+			// submit btn
+			HTTPAddPGMCharToBuffer(&(UECShtmlSUBMIT[0]));
+		}
+		else
+		{
+			sprintf(UECStempStr20, "%d-%d-%d-%d", U_ccmList[i].baseAttribute[AT_ROOM], U_ccmList[i].baseAttribute[AT_REGI], U_ccmList[i].baseAttribute[AT_ORDE], U_ccmList[i].baseAttribute[AT_PRIO]);
+			HTTPAddCharToBuffer(UECStempStr20);
+			HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
+			HTTPAddCharToBuffer(U_ccmList[i].typeStr);
+			HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
+			HTTPAddPGMCharToBuffer(U_ccmList[i].type);
+			HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
+
+			// Edit Link
+			HTTPAddPGMCharToBuffer(&(UECSAHREF3[0]));
+			sprintf(UECStempStr20, "%d", i);
+			HTTPAddCharToBuffer(UECStempStr20);
+			HTTPAddPGMCharToBuffer(&(UECSTagClose[0]));
+			HTTPAddPGMCharToBuffer(&(UECShtmlEditCCMEditTxt[0]));
+			HTTPAddPGMCharToBuffer(&(UECSSlashA[0])); //</a>
+		}
+		HTTPAddPGMCharToBuffer(&(UECStdtr[0])); //</td><tr>
+	}
+
+	//-------------
+
+	HTTPAddPGMCharToBuffer(&(UECShtmlTABLECLOSE[0]));
+	HTTPAddPGMCharToBuffer(&(UECSformend[0]));
+
+	HTTPAddPGMCharToBuffer(&(UECShtmlEditCCMCmdBtn1[0]));
+	sprintf(UECStempStr20, "%d-%d-%d-%d", U_ccmList[ccmid].baseAttribute[AT_ROOM], U_ccmList[ccmid].baseAttribute[AT_REGI], U_ccmList[ccmid].baseAttribute[AT_ORDE], U_ccmList[ccmid].baseAttribute[AT_PRIO]);
+	HTTPAddCharToBuffer(UECStempStr20);
+	HTTPAddPGMCharToBuffer(&(UECShtmlEditCCMCmdBtn2[0]));
+
+	HTTPAddPGMCharToBuffer(&(UECShtmlRETURNINDEX[0]));
+
+	// Javascript
+	HTTPAddPGMCharToBuffer(&(UECShtmlEditCCMCmdBtnScript1[0]));
+	sprintf(UECStempStr20, "%d", ccmid + 100);
+	HTTPAddCharToBuffer(UECStempStr20);
+	HTTPAddPGMCharToBuffer(&(UECShtmlEditCCMCmdBtnScript2[0]));
+
 	HTTPAddPGMCharToBuffer(&(UECShtmlHTMLCLOSE[0]));
 
 	HTTPCloseBuffer();
@@ -1011,16 +1212,179 @@ void HTTPGetFormDataCCMPage()
 
 	for (i = 0; i < U_HtmlLine; i++)
 	{
-		UECS_EEPROM_writeLong(EEPROM_OFFSET_WEBDATA + i * 4, *(U_html[i].data));
+		UECS_EEPROM_writeLong(EEPROM_WEBDATA + i * 4, *(U_html[i].data));
 	}
 }
+
+int HTTPGetFormDataEDITCCMPage()
+{
+	int i;
+	int startPos = 0;
+	int progPos = 0;
+	unsigned char tempDecimal;
+	long ccmid, room, region, order, priority;
+
+	if (!UECSFindPGMChar(&UECSbuffer[startPos], UECSaccess_LEQUAL, &progPos))
+	{
+		return -1;
+	}
+	startPos += progPos;
+	if (!UECSGetFixedFloatValue(&UECSbuffer[startPos], &ccmid, &tempDecimal, &progPos))
+	{
+		return -1;
+	}
+	startPos += progPos;
+	// if(UECSbuffer[startPos]!='&'){return -1;}//last '&' not found
+	if (tempDecimal != 0)
+	{
+		return -1;
+	}
+
+	// Room
+	if (!UECSFindPGMChar(&UECSbuffer[startPos], UECSaccess_LEQUAL, &progPos))
+	{
+		return ccmid;
+	}
+	startPos += progPos;
+	if (!UECSGetFixedFloatValue(&UECSbuffer[startPos], &room, &tempDecimal, &progPos))
+	{
+		return ccmid;
+	}
+	startPos += progPos;
+	if (UECSbuffer[startPos] != '&')
+	{
+		return ccmid;
+	} // last '&' not found
+	if (tempDecimal != 0)
+	{
+		return ccmid;
+	}
+	room = constrain(room, 0, 127);
+
+	// Region
+	if (!UECSFindPGMChar(&UECSbuffer[startPos], UECSaccess_LEQUAL, &progPos))
+	{
+		return ccmid;
+	}
+	startPos += progPos;
+	if (!UECSGetFixedFloatValue(&UECSbuffer[startPos], &region, &tempDecimal, &progPos))
+	{
+		return ccmid;
+	}
+	startPos += progPos;
+	if (UECSbuffer[startPos] != '&')
+	{
+		return ccmid;
+	} // last '&' not found
+	if (tempDecimal != 0)
+	{
+		return ccmid;
+	}
+	region = constrain(region, 0, 127);
+
+	// Order
+	if (!UECSFindPGMChar(&UECSbuffer[startPos], UECSaccess_LEQUAL, &progPos))
+	{
+		return ccmid;
+	}
+	startPos += progPos;
+	if (!UECSGetFixedFloatValue(&UECSbuffer[startPos], &order, &tempDecimal, &progPos))
+	{
+		return ccmid;
+	}
+	startPos += progPos;
+	if (UECSbuffer[startPos] != '&')
+	{
+		return ccmid;
+	} // last '&' not found
+	if (tempDecimal != 0)
+	{
+		return ccmid;
+	}
+	order = constrain(order, 0, 30000);
+
+	// Priority
+	if (!UECSFindPGMChar(&UECSbuffer[startPos], UECSaccess_LEQUAL, &progPos))
+	{
+		return ccmid;
+	}
+	startPos += progPos;
+	if (!UECSGetFixedFloatValue(&UECSbuffer[startPos], &priority, &tempDecimal, &progPos))
+	{
+		return ccmid;
+	}
+	startPos += progPos;
+	if (UECSbuffer[startPos] != '&')
+	{
+		return ccmid;
+	} // last '&' not found
+	if (tempDecimal != 0)
+	{
+		return ccmid;
+	}
+	priority = constrain(priority, 0, 30);
+
+	U_ccmList[ccmid].baseAttribute[AT_ROOM] = room;
+	U_ccmList[ccmid].baseAttribute[AT_REGI] = region;
+	U_ccmList[ccmid].baseAttribute[AT_ORDE] = order;
+	U_ccmList[ccmid].baseAttribute[AT_PRIO] = priority;
+
+	UECS_EEPROM_SaveCCMAttribute(ccmid);
+
+	//---------------------------Type
+	if (!UECSFindPGMChar(&UECSbuffer[startPos], UECSaccess_LEQUAL, &progPos))
+	{
+		return ccmid;
+	}
+	startPos += progPos;
+
+	// copy type
+	int count = 0;
+	for (i = 0; i < MAX_CCMTYPESIZE; i++)
+	{
+		if (UECSbuffer[startPos + i] == '&')
+		{
+			break;
+		}
+		if (UECSbuffer[startPos + i] == '\0' || i == MAX_CCMTYPESIZE)
+		{
+			return ccmid;
+		} // ���[���Ȃ�
+
+		if ((UECSbuffer[startPos + i] >= '0' && UECSbuffer[startPos + i] <= '9') ||
+			(UECSbuffer[startPos + i] >= 'A' && UECSbuffer[startPos + i] <= 'Z') ||
+			(UECSbuffer[startPos + i] >= 'a' && UECSbuffer[startPos + i] <= 'z') ||
+			UECSbuffer[startPos + i] == '.' || UECSbuffer[startPos + i] == '_')
+		{
+		}
+		else
+		{
+			UECSbuffer[startPos + i] = 'x';
+		}
+
+		UECStempStr20[i] = UECSbuffer[startPos + i];
+		count++;
+	}
+
+	UECStempStr20[i] = '\0'; // set end code
+
+	if (count >= 3 && count <= 19)
+	{
+
+		strcpy(U_ccmList[ccmid].typeStr, UECStempStr20);
+		UECS_EEPROM_SaveCCMType(ccmid);
+	}
+
+	return ccmid;
+}
+
 //--------------------------------------------------------------------------
 void HTTPGetFormDataLANSettingPage()
 {
 	int i;
 	int startPos = 0;
 	int progPos = 0;
-	long UECStempValue[20];
+	long UECStempValue[16];
 	unsigned char tempDecimal;
 	int skip_counter = 0;
 	//
@@ -1028,14 +1392,11 @@ void HTTPGetFormDataLANSettingPage()
 	// SUBNET    4
 	// GATEWAY   4
 	// DNS       4
-	// room      1
-	// region    1
-	// order     1
 	//-------------
-	// total    19
+	// total    16
 
 	// get value
-	for (i = 0; i < 19; i++)
+	for (i = 0; i < 16; i++)
 	{
 		if (!UECSFindPGMChar(&UECSbuffer[startPos], UECSaccess_LEQUAL, &progPos))
 		{
@@ -1057,42 +1418,17 @@ void HTTPGetFormDataLANSettingPage()
 		}
 
 		// check value and write
-		if (i < 18 && (UECStempValue[i] < 0 || UECStempValue[i] > 255))
+		if (UECStempValue[i] < 0 || UECStempValue[i] > 255)
 		{
 			return;
-		} // IP address,room,region
-		else if (UECStempValue[i] < 0 || UECStempValue[i] > 30000)
-		{
-			return;
-		} // order
+		} // IP address
 	}
 
-	// order requires 2byte
-	// UECStempValue[18]	order low
-	// UECStempValue[19]	order high
-	// set "order" high-byte
-	UECStempValue[19] = (UECStempValue[18] / 256) & 127;
-
-	skip_counter = 0;
-	for (int i = 0; i < 20; i++)
+	for (int i = 0; i < 16; i++)
 	{
-		if (EEPROM.read(EEPROM_OFFSET_DATATOP + i) != (unsigned char)UECStempValue[i]) // skip same value
-		{
-			EEPROM.write(EEPROM_OFFSET_DATATOP + i, (unsigned char)UECStempValue[i]);
-			U_orgAttribute.status |= STATUS_NEEDRESET;
-
-			// EEPROM.commit();
-			Serial.println("save UECS main buf");
-			// delay(100);
-		}
-		else
-			skip_counter++;
+		UECS_EEPROM_writeLong(EEPROM_DATATOP + i, UECStempValue[i]); // save to EEPROM
 	}
-	// writing EEPROM, ESP32 specification
-	if (skip_counter < 20)
-	{
-		EEPROM.commit();
-	}
+	
 
 	//---------------------------NODE NAME
 	if (!UECSFindPGMChar(&UECSbuffer[startPos], UECSaccess_LEQUAL, &progPos))
@@ -1132,26 +1468,53 @@ void HTTPGetFormDataLANSettingPage()
 
 	for (int i = 0; i < 20; i++)
 	{
-		U_nodename[i] = UECStempStr20[i];
-
-		if (EEPROM.read(EEPROM_OFFSET_NODENAME + i) != U_nodename[i]) // skip same value
+		UECS_EEPROM_writeChar(EEPROM_NODENAME + i, UECStempStr20[i]); // save to EEPROM
+		if (UECStempStr20[i] == '\0')
 		{
-			EEPROM.write(EEPROM_OFFSET_NODENAME + i, U_nodename[i]);
-			// EEPROM.commit();
-			// delay(100);
-			Serial.println("save UECS Node Name");
-		}
-		else
-			skip_counter++;
-	}
-	// writing EEPROM, ESP32 specification
-
-	if (skip_counter < 20)
-	{
-		EEPROM.commit();
+			break;
+		} // end code
 	}
 
 	return;
+}
+
+//--------------------------------------------------------------------
+void HTTPGetFormDataFillCCMAttributePage()
+{
+	int i;
+	int startPos = 0;
+	int progPos = 0;
+	unsigned char tempDecimal;
+	long ccmid;
+
+	if (!UECSFindPGMChar(&UECSbuffer[startPos], UECSaccess_LEQUAL, &progPos))
+	{
+		return;
+	}
+	startPos += progPos;
+	if (!UECSGetFixedFloatValue(&UECSbuffer[startPos], &ccmid, &tempDecimal, &progPos))
+	{
+		return;
+	}
+	startPos += progPos;
+	if (tempDecimal != 0)
+	{
+		return;
+	}
+	ccmid -= 100;
+	if (ccmid < 0 || ccmid >= U_MAX_CCM)
+	{
+		return;
+	}
+
+	for (i = 0; i < U_MAX_CCM; i++)
+	{
+		U_ccmList[i].baseAttribute[AT_ROOM] = U_ccmList[ccmid].baseAttribute[AT_ROOM];
+		U_ccmList[i].baseAttribute[AT_REGI] = U_ccmList[ccmid].baseAttribute[AT_REGI];
+		U_ccmList[i].baseAttribute[AT_ORDE] = U_ccmList[ccmid].baseAttribute[AT_ORDE];
+		U_ccmList[i].baseAttribute[AT_PRIO] = U_ccmList[ccmid].baseAttribute[AT_PRIO];
+		UECS_EEPROM_SaveCCMAttribute(i);
+	}
 }
 
 //---------------------------------------------####################
@@ -1197,13 +1560,44 @@ void HTTPcheckRequest()
 				{
 					HTTPGetFormDataCCMPage();
 					// HTTPsendPageCCM();
-					HTTPPrintRedirectP1();
+					HTTPPrintRedirect(1);
 				}
 				// send LAN setting
 				else if (UECSFindPGMChar(UECSbuffer, &(UECSaccess_NOSPC_GETP2A[0]), &progPos)) // include form data
 				{
 					HTTPGetFormDataLANSettingPage(); // save setting
 					HTTPsendPageLANSetting();		 // reload LAN setting page
+				}
+				// edit CCM page
+				else if (UECSFindPGMChar(UECSbuffer, &(UECSaccess_NOSPC_GETP3A[0]), &progPos))
+				{
+					int ccmid = HTTPGetFormDataEDITCCMPage();
+					// Type Reset
+					if (ccmid == 999)
+					{
+						for (int i = 0; i < U_MAX_CCM; i++)
+						{
+							strcpy_P(U_ccmList[i].typeStr, U_ccmList[i].type);
+							UECS_EEPROM_SaveCCMType(i);
+						}
+						HTTPPrintRedirect(3);
+					}
+					// Attribute Reset
+					else if (ccmid - 100 >= 0 && ccmid - 100 < U_MAX_CCM)
+					{
+						HTTPGetFormDataFillCCMAttributePage();
+						HTTPPrintRedirect(3);
+					}
+					// Err
+					else if (ccmid < 0 || ccmid >= U_MAX_CCM)
+					{
+						HTTPsendPageError();
+					}
+					// CCM Edit
+					else
+					{
+						HTTPsendPageEDITCCM(ccmid);
+					}
 				}
 				else
 				{
@@ -1218,10 +1612,6 @@ void HTTPcheckRequest()
 //////////////////
 //// html ////////
 //////////////////
-
-void UDPReadCallback(AsyncUDPPacket packet)
-{
-}
 
 void UECSupdate16520portReceive(UECSTEMPCCM *_tempCCM, unsigned long _millis)
 {
@@ -1261,14 +1651,35 @@ void UECSupdate16529port(UECSTEMPCCM *_tempCCM)
 		}
 	}
 }
+
+//----------------------------------
+void UECSupdate16521port(UECSTEMPCCM *_tempCCM)
+{
+
+	int packetSize = UECS_UDP16521.listen(16521);
+	if (packetSize)
+	{
+		ClearMainBuffer();
+		UECS_UDP16521.onPacket([_tempCCM](AsyncUDPPacket packet)
+							   { 
+			_tempCCM->address = packet.remoteIP();
+			UECSbuffer[packet.read((uint8_t *)UECSbuffer, BUF_SIZE - 1)] = '\0'; });
+		UDPFilterToBuffer();
+		UECSresCCMSearchAndSend(_tempCCM);
+	}
+}
+
 //----------------------------------
 
 void UECSsetup()
 {
+	UECSCheckProgramUpdate();
+	delay(3000);
+
 	pinMode(U_InitPin, INPUT_PULLUP);
 	Serial.begin(115200);
 
-	if (digitalRead(U_InitPin) == U_InitPin_Sense || UECS_EEPROM_readLong(EEPROM_OFFSET_IP) == -1)
+	if (digitalRead(U_InitPin) == U_InitPin_Sense || UECS_EEPROM_readLong(EEPROM_IP) == -1)
 	{
 		U_orgAttribute.status |= STATUS_SAFEMODE;
 		Serial.println("Wakeup with safe mode");
@@ -1285,6 +1696,143 @@ void UECSsetup()
 	UserInit();
 	UECSSetWiFiConfig();
 }
+
+//---------------------------------------------
+void UECSCheckProgramUpdate()
+{
+	// Program Upadate Check
+	ClearMainBuffer();
+	UDPAddPGMCharToBuffer(&(ProgramDate[0]));
+	UDPAddPGMCharToBuffer(&(ProgramTime[0]));
+	// check and write datetime
+	int i;
+	for (i = 0; i < (EEPROM_CCMTOP - EEPROM_PROGRAMDATETIME); i++)
+	{
+
+		if (EEPROM.read(i + EEPROM_PROGRAMDATETIME) != UECSbuffer[i])
+		{
+			U_orgAttribute.status |= STATUS_PROGRAMUPDATE;
+			UECS_EEPROM_writeChar(i + EEPROM_PROGRAMDATETIME, UECSbuffer[i]);
+		}
+		if (UECSbuffer[i] == '\0')
+		{
+			break;
+		}
+	}
+}
+
+//--------------------------------------------------------------
+void UECS_EEPROM_SaveCCMType(int ccmid)
+{
+#if defined(_ARDUINIO_MEGA_SETTING)
+	if (ccmid * EEPROM_L_CCM_TOTAL + EEPROM_L_CCM_TOTAL > EEPROM_CCMEND)
+	{
+		return;
+	} // out of memory
+#endif
+
+	int i;
+	// type��������
+	for (i = 0; i <= MAX_CCMTYPESIZE; i++)
+	{
+		if (UECS_EEPROM_readChar(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_TYPETXT + i) != U_ccmList[ccmid].typeStr[i])
+		{
+			UECS_EEPROM_writeChar(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_TYPETXT + i, U_ccmList[ccmid].typeStr[i]);
+		}
+		if (U_ccmList[ccmid].typeStr[i] == '\0')
+		{
+			break;
+		}
+	}
+}
+//--------------------------------------------------------------
+void UECS_EEPROM_SaveCCMAttribute(int ccmid)
+{
+	if (ccmid * EEPROM_L_CCM_TOTAL + EEPROM_L_CCM_TOTAL > EEPROM_CCMEND)
+	{
+		return;
+	} // out of memory
+
+
+	if (UECS_EEPROM_readByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_ROOM) != (unsigned char)(U_ccmList[ccmid].baseAttribute[AT_ROOM]))
+	{
+		UECS_EEPROM_writeByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_ROOM, (unsigned char)(U_ccmList[ccmid].baseAttribute[AT_ROOM]));
+	}
+
+	if (UECS_EEPROM_readByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_REGI) != (unsigned char)(U_ccmList[ccmid].baseAttribute[AT_REGI]))
+	{
+		UECS_EEPROM_writeByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_REGI, (unsigned char)(U_ccmList[ccmid].baseAttribute[AT_REGI]));
+	}
+
+	if (UECS_EEPROM_readByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_ORDE_L) != (unsigned char)(U_ccmList[ccmid].baseAttribute[AT_ORDE]))
+	{
+		UECS_EEPROM_writeByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_ORDE_L, (unsigned char)(U_ccmList[ccmid].baseAttribute[AT_ORDE]));
+	}
+
+	if (UECS_EEPROM_readByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_ORDE_H) != (unsigned char)(U_ccmList[ccmid].baseAttribute[AT_ORDE] / 256))
+	{
+		UECS_EEPROM_writeByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_ORDE_H, (unsigned char)(U_ccmList[ccmid].baseAttribute[AT_ORDE] / 256));
+	}
+
+	if (UECS_EEPROM_readByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_PRIO) != (unsigned char)(U_ccmList[ccmid].baseAttribute[AT_PRIO]))
+	{
+		UECS_EEPROM_writeByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_PRIO, (unsigned char)(U_ccmList[ccmid].baseAttribute[AT_PRIO]));
+	}
+}
+
+//--------------------------------------------------------------
+void UECS_EEPROM_LoadCCMSetting(int ccmid)
+{
+#if defined(_ARDUINIO_MEGA_SETTING)
+	if (ccmid * EEPROM_L_CCM_TOTAL + EEPROM_L_CCM_TOTAL > EEPROM_CCMEND)
+	{
+		return;
+	} // out of memory
+#endif
+
+	int i;
+	for (i = 0; i < MAX_CCMTYPESIZE; i++)
+	{
+		U_ccmList[ccmid].typeStr[i] = UECS_EEPROM_readChar(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_TYPETXT + i);
+		if (U_ccmList[ccmid].typeStr[i] == 255)
+		{
+			U_ccmList[ccmid].typeStr[i] = 'x';
+			break;
+		}
+		if (U_ccmList[ccmid].typeStr[i] == '\0')
+		{
+			break;
+		}
+	}
+	U_ccmList[ccmid].typeStr[i] = '\0';
+
+	/*
+	U_ccmList[ccmid].baseAttribute[AT_ROOM]=UECS_EEPROM_readByte(ccmid*EEPROM_L_CCM_TOTAL+EEPROM_CCMTOP+EEPROM_L_CCM_ROOM) & 127;
+	U_ccmList[ccmid].baseAttribute[AT_REGI]=UECS_EEPROM_readByte(ccmid*EEPROM_L_CCM_TOTAL+EEPROM_CCMTOP+EEPROM_L_CCM_REGI) & 127;
+	U_ccmList[ccmid].baseAttribute[AT_ORDE]=
+		(UECS_EEPROM_readByte(ccmid*EEPROM_L_CCM_TOTAL+EEPROM_CCMTOP+EEPROM_L_CCM_ORDE_L)+
+		UECS_EEPROM_readByte(ccmid*EEPROM_L_CCM_TOTAL+EEPROM_CCMTOP+EEPROM_L_CCM_ORDE_H)*256) & 32767;
+	U_ccmList[ccmid].baseAttribute[AT_PRIO]=UECS_EEPROM_readByte(ccmid*EEPROM_L_CCM_TOTAL+EEPROM_CCMTOP+EEPROM_L_CCM_PRIO) & 31;
+	U_ccmList[ccmid].attribute[AT_PRIO] =U_ccmList[ccmid].baseAttribute[AT_PRIO];
+	*/
+	U_ccmList[ccmid].baseAttribute[AT_ROOM] = UECS_EEPROM_readByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_ROOM);
+	U_ccmList[ccmid].baseAttribute[AT_REGI] = UECS_EEPROM_readByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_REGI);
+	U_ccmList[ccmid].baseAttribute[AT_ORDE] = (UECS_EEPROM_readByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_ORDE_L) + UECS_EEPROM_readByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_ORDE_H) * 256);
+	U_ccmList[ccmid].baseAttribute[AT_PRIO] = UECS_EEPROM_readByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_PRIO);
+
+	// Prepare the correct values for the Arduino where the data will be written for the first time.
+	if (U_ccmList[ccmid].baseAttribute[AT_ROOM] == 0xff)
+	{
+		U_ccmList[ccmid].baseAttribute[AT_ROOM] = 1;
+		U_ccmList[ccmid].baseAttribute[AT_REGI] = 1;
+		U_ccmList[ccmid].baseAttribute[AT_ORDE] = 1;
+		U_ccmList[ccmid].baseAttribute[AT_PRIO] = U_ccmList[ccmid].attribute[AT_PRIO];
+		UECS_EEPROM_SaveCCMAttribute(ccmid);
+	}
+	U_ccmList[ccmid].attribute[AT_PRIO] = U_ccmList[ccmid].baseAttribute[AT_PRIO];
+}
+
+//---------------------------------------------
 
 void UECSStartServer()
 {
@@ -1339,9 +1887,7 @@ void UECSSetWiFiConfig()
 	Serial.println(ip);
 	Serial.println(gateway);
 	Serial.println(subnet);
-
 }
-
 //---------------------------------------------------------
 void UECSresetWiFi()
 {
@@ -1419,7 +1965,6 @@ void UECSloop()
 		if (U_ccmList[i].sender && U_ccmList[i].flagStimeRfirst && U_ccmList[i].ccmLevel != NONE)
 		{
 			UECSCreateCCMPacketAndSend(&U_ccmList[i]);
-			// U_ccmList[i].old_value=U_ccmList[i].value;
 		}
 	}
 }
@@ -1429,10 +1974,10 @@ void UECSinitOrgAttribute()
 
 	for (int i = 0; i < 4; i++)
 	{
-		U_orgAttribute.ip[i] = EEPROM.read(i + EEPROM_OFFSET_IP);
-		U_orgAttribute.subnet[i] = EEPROM.read(i + EEPROM_OFFSET_SUBNET);
-		U_orgAttribute.gateway[i] = EEPROM.read(i + EEPROM_OFFSET_GATEWAY);
-		U_orgAttribute.dns[i] = EEPROM.read(i + EEPROM_OFFSET_DNS);
+		U_orgAttribute.ip[i] = UECS_EEPROM_readByte(i + EEPROM_IP);
+		U_orgAttribute.subnet[i] = UECS_EEPROM_readByte(i + EEPROM_SUBNET);
+		U_orgAttribute.gateway[i] = UECS_EEPROM_readByte(i + EEPROM_GATEWAY);
+		U_orgAttribute.dns[i] = UECS_EEPROM_readByte(i + EEPROM_DNS);
 	}
 
 	// reset web form
@@ -1441,13 +1986,13 @@ void UECSinitOrgAttribute()
 		*(U_html[i].data) = U_html[i].minValue;
 	}
 
-	U_orgAttribute.room = EEPROM.read(EEPROM_OFFSET_ROOM);
-	U_orgAttribute.region = EEPROM.read(EEPROM_OFFSET_REGION);
-	U_orgAttribute.order = EEPROM.read(EEPROM_OFFSET_ORDER_L) + (unsigned short)(EEPROM.read(EEPROM_OFFSET_ORDER_H)) * 256;
-	if (U_orgAttribute.order > 30000)
-	{
-		U_orgAttribute.order = 30000;
-	}
+	// U_orgAttribute.room = UECS_EEPROM_readByte(EEPROM_OFFSET_ROOM);
+	// U_orgAttribute.region = UECS_EEPROM_readByte(EEPROM_OFFSET_REGION);
+	// U_orgAttribute.order = UECS_EEPROM_readByte(EEPROM_OFFSET_ORDER_L) + (unsigned short)(UECS_EEPROM_readByte(EEPROM_OFFSET_ORDER_H)) * 256;
+	// if (U_orgAttribute.order > 30000)
+	// {
+	// 	U_orgAttribute.order = 30000;
+	// }
 
 	if (U_orgAttribute.status & STATUS_SAFEMODE)
 	{
@@ -1456,12 +2001,12 @@ void UECSinitOrgAttribute()
 
 	for (int i = 0; i < 20; i++)
 	{
-		U_nodename[i] = EEPROM.read(EEPROM_OFFSET_NODENAME + i);
+		U_nodename[i] = UECS_EEPROM_readChar(EEPROM_NODENAME + i);
 	}
 
 	for (int i = 0; i < U_HtmlLine; i++)
 	{
-		*(U_html[i].data) = UECS_EEPROM_readLong(EEPROM_OFFSET_WEBDATA + i * 4);
+		*(U_html[i].data) = UECS_EEPROM_readLong(EEPROM_WEBDATA + i * 4);
 	}
 }
 //------------------------------------------------------
@@ -1500,23 +2045,32 @@ void UECSsetCCM(boolean _sender, signed char _num, const char *_name, const char
 	}
 	U_ccmList[_num].sender = _sender;
 	U_ccmList[_num].ccmLevel = _ccmLevel;
-
 	U_ccmList[_num].name = _name;
 	U_ccmList[_num].type = _type;
 	U_ccmList[_num].unit = _unit;
-	U_ccmList[_num].baseAttribute[AT_ROOM] = U_orgAttribute.room;
-	U_ccmList[_num].baseAttribute[AT_REGI] = U_orgAttribute.region;
-	U_ccmList[_num].baseAttribute[AT_ORDE] = U_orgAttribute.order;
-	U_ccmList[_num].attribute[AT_ROOM] = 0;
-	U_ccmList[_num].attribute[AT_REGI] = 0;
-	U_ccmList[_num].attribute[AT_ORDE] = 0;
-	U_ccmList[_num].attribute[AT_PRIO] = _priority;
 	U_ccmList[_num].decimal = _decimal;
 	U_ccmList[_num].ccmLevel = _ccmLevel;
 	U_ccmList[_num].address[0] = 255;
 	U_ccmList[_num].address[1] = 255;
 	U_ccmList[_num].address[2] = 255;
 	U_ccmList[_num].address[3] = 255;
+	U_ccmList[_num].attribute[AT_ROOM] = 0;
+	U_ccmList[_num].attribute[AT_REGI] = 0;
+	U_ccmList[_num].attribute[AT_ORDE] = 0;
+	U_ccmList[_num].attribute[AT_PRIO] = _priority;
+	//  U_ccmList[_num].baseAttribute[AT_ROOM] = 1;
+	//  U_ccmList[_num].baseAttribute[AT_REGI] = 1;
+	//  U_ccmList[_num].baseAttribute[AT_ORDE] = 1;
+	U_ccmList[_num].baseAttribute[AT_PRIO] = _priority;
+	strcat_P(U_ccmList[_num].typeStr, U_ccmList[_num].type);
+
+	if (U_orgAttribute.status & STATUS_PROGRAMUPDATE)
+	{
+		UECS_EEPROM_SaveCCMType(_num);
+	}
+
+	UECS_EEPROM_LoadCCMSetting(_num);
+
 	return;
 }
 
@@ -2065,9 +2619,142 @@ bool ChangeWebValue(signed long *data, signed long value)
 		if (U_html[i].data == data)
 		{
 			*(U_html[i].data) = value;
-			UECS_EEPROM_writeLong(EEPROM_OFFSET_WEBDATA + i * 4, *(U_html[i].data));
+			UECS_EEPROM_writeLong(EEPROM_WEBDATA + i * 4, *(U_html[i].data));
 			return true;
 		}
 	}
 	return false;
+}
+
+/********************************/
+/* 16521 Response   *************/
+/********************************/
+
+boolean UECSresCCMSearchAndSend(UECSTEMPCCM *_tempCCM)
+{
+	// CCM provider search response
+	/*
+	In periodic transmission, only CCMs with a proven track record of transmission will return a response.
+	Among regularly sent CCMs, CCMs that have not been sent at the specified frequency will not return a response even if they are registered.
+	This is to prevent accidental reference to broken sensors.
+	*/
+	int i;
+	int progPos = 0;
+	int startPos = 0;
+	short room = 0;
+	short region = 0;
+	short order = 0;
+
+	if (!UECSFindPGMChar(UECSbuffer, &UECSccm_XMLHEADER[0], &progPos))
+	{
+		return false;
+	}
+	startPos += progPos;
+
+	if (!UECSFindPGMChar(&UECSbuffer[startPos], &UECSccm_UECSVER_E10[0], &progPos))
+	{
+		return false;
+	}
+	startPos += progPos;
+
+	if (!UECSFindPGMChar(&UECSbuffer[startPos], &UECSccm_CCMSEARCH[0], &progPos))
+	{
+		return false;
+	}
+	startPos += progPos;
+
+	// copy ccm type string
+	for (i = 0; i < MAX_TYPE_CHAR; i++)
+	{
+		UECStempStr20[i] = UECSbuffer[startPos + i];
+		if (UECStempStr20[i] == ASCIICODE_DQUOT || UECStempStr20[i] == '\0')
+		{
+			UECStempStr20[i] = '\0';
+			break;
+		}
+	}
+	UECStempStr20[MAX_CCMTYPESIZE] = '\0';
+	startPos = startPos + i;
+
+	// Extract "room", "region", and "order". If not found, it is assumed to be zero.
+	UECSGetValPGMStrAndChr(&UECSbuffer[startPos], &UECSccm_CCMSEARCH_ROOM[0], '\"', &room, &progPos);
+	UECSGetValPGMStrAndChr(&UECSbuffer[startPos], &UECSccm_CCMSEARCH_REGION[0], '\"', &region, &progPos);
+	UECSGetValPGMStrAndChr(&UECSbuffer[startPos], &UECSccm_CCMSEARCH_ORDER[0], '\"', &order, &progPos);
+	// Serial.print(room);Serial.print("-");
+	// Serial.print(region);Serial.print("-");
+	// Serial.print(order);Serial.print("\n");
+
+	for (int id = 0; id < U_MAX_CCM; id++)
+	{
+		if (UECSCCMSimpleHitcheck(id, room, region, order))
+		{
+			// Serial.print(id);Serial.print("/");
+			// Serial.println(U_ccmList[id].typeStr);
+			// packet create
+			ClearMainBuffer();
+			UDPAddPGMCharToBuffer(&(UECSccm_XMLHEADER[0]));
+			UDPAddPGMCharToBuffer(&(UECSccm_UECSVER_E10[0]));
+			UDPAddPGMCharToBuffer(&(UECSccm_CCMSERVER[0]));
+			UDPAddCharToBuffer(UECStempStr20);
+			UDPAddPGMCharToBuffer(&(UECSccm_ROOMTXT[0]));
+			// room
+			UDPAddValueToBuffer(U_ccmList[id].baseAttribute[AT_ROOM]);
+			UDPAddPGMCharToBuffer(&(UECSccm_REGIONTXT[0]));
+			// region
+			UDPAddValueToBuffer(U_ccmList[id].baseAttribute[AT_REGI]);
+			UDPAddPGMCharToBuffer(&(UECSccm_ORDERTXT[0]));
+			// order
+			UDPAddValueToBuffer(U_ccmList[id].baseAttribute[AT_ORDE]);
+			UDPAddPGMCharToBuffer(&(UECSCCM_PRIOTXT[0]));
+			// priority
+			UDPAddValueToBuffer(U_ccmList[id].baseAttribute[AT_PRIO]);
+			UDPAddPGMCharToBuffer(&(UECSccm_CLOSETAG[0]));
+			// IP
+			char iptxt[20];
+			if (U_orgAttribute.status & STATUS_SAFEMODE)
+			{
+				UDPAddPGMCharToBuffer(&(UECSdefaultIPAddress[0]));
+			}
+			else
+			{
+				sprintf(iptxt, "%d.%d.%d.%d", U_orgAttribute.ip[0], U_orgAttribute.ip[1], U_orgAttribute.ip[2], U_orgAttribute.ip[3]);
+				UDPAddCharToBuffer(iptxt);
+			}
+			UDPAddPGMCharToBuffer(&(UECSccm_CCMSERVERCLOSE[0]));
+
+			//----------------------------------------------send
+			UECS_UDP16521.writeTo((const uint8_t *)UECSbuffer, sizeof(UECSbuffer), _tempCCM->address, 16521);
+		}
+	}
+
+	return true;
+}
+//------------------------------------------------------------------------------
+boolean UECSCCMSimpleHitcheck(int ccmid, short room, short region, short order)
+{
+	if (U_ccmList[ccmid].ccmLevel == NONE || !U_ccmList[ccmid].sender)
+	{
+		return false;
+	}
+	if (strcmp(U_ccmList[ccmid].typeStr, UECStempStr20) != 0)
+	{
+		return false;
+	}
+	if (!U_ccmList[ccmid].validity && U_ccmList[ccmid].ccmLevel <= A_1M_1)
+	{
+		return false;
+	}
+	if (!(room == 0 || U_ccmList[ccmid].baseAttribute[AT_ROOM] == 0 || U_ccmList[ccmid].baseAttribute[AT_ROOM] == room))
+	{
+		return false;
+	}
+	if (!(region == 0 || U_ccmList[ccmid].baseAttribute[AT_REGI] == 0 || U_ccmList[ccmid].baseAttribute[AT_REGI] == region))
+	{
+		return false;
+	}
+	if (!(order == 0 || U_ccmList[ccmid].baseAttribute[AT_ORDE] == 0 || U_ccmList[ccmid].baseAttribute[AT_ORDE] == order))
+	{
+		return false;
+	}
+	return true;
 }
