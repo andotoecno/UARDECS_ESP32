@@ -1,7 +1,8 @@
 /*
-  Uardecs.h - Library for UECS 
-
-
+  Uardecs_ESP32.h - UECS Library for ESP32 via WiFi
+  Yusaku Nakajima 2024.
+  
+  Original UECS for Arduino Library is created by
   Ken-ichiro Yasuba 2013.
   updated by Hideto Kurosaki 2022.4.
 
