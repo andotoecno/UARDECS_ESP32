@@ -8,11 +8,6 @@
     - UECS-Pi, Arsprout Piでの受信確認。
 - 実装の詳細や移植時のメモは[README_dev.md](README_dev.md)を参照してください。
 
-## 使用上の注意
-- UECSの外でEEPROM.begin()を呼ぶ必要があります。
-  - UECSsetup内で実行すると、UECS以外でEEPROMを使う際に多重にEEPROM.begin()し意図しないアドレスを使う可能性があるので、あえてUECSの外で明示的に呼ぶ仕様にしています。
-  - UECSのデフォルトでは0x32~1024までを使っています。UECS以外でEEPROMを利用する場合はアドレスをかぶせないように注意してください。
-
 ## ライセンス
 - [MITライセンス](https://opensource.org/licenses/MIT)に基づいています。
 - 詳細は[LICENSE](LICENSE)を参照してください。

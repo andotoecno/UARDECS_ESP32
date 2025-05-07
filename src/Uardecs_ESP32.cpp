@@ -1265,6 +1265,7 @@ void UECSupdate16529port(UECSTEMPCCM *_tempCCM)
 
 void UECSsetup()
 {
+	EEPROM.begin(EEPROM_OFFSET_DATAEND);
 	pinMode(U_InitPin, INPUT_PULLUP);
 	Serial.begin(115200);
 
