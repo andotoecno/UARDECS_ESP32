@@ -465,7 +465,7 @@ extern const char U_name[] PROGMEM;
 extern const char U_vender[] PROGMEM;
 extern const char U_uecsid[] PROGMEM;
 extern const char U_footnote[] PROGMEM;
-extern char U_nodename[];
+extern char U_nodename[25];
 extern UECSOriginalAttribute U_orgAttribute;
 extern const char *UECSCCMLEVEL[];
 

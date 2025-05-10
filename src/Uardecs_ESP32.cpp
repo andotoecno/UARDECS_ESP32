@@ -1445,43 +1445,119 @@ void HTTPGetFormDataLANSettingPage()
 	startPos += progPos;
 
 	// copy node name
-	for (i = 0; i < 20; i++)
-	{
+	// U_nodename の最大長 (ヌル文字含まず)
+	int maxNodeNameBytes = sizeof(U_nodename) - 1;
+	int currentNodeNameBytes = 0; // 現在の U_nodename の有効なバイト数
+	int bufferIdx = 0;			  // UECSbuffer を読み進めるインデックス
 
-		if (UECSbuffer[startPos + i] == '<' || UECSbuffer[startPos + i] == '>') // eliminate tag
+	// まず U_nodename をクリア
+	memset(U_nodename, 0, sizeof(U_nodename));
+
+	while (currentNodeNameBytes < maxNodeNameBytes)
+	{ // U_nodename に空きがある間ループ
+		char firstByteOfChar = UECSbuffer[startPos + bufferIdx];
+
+		// 入力ソースの終端チェック ('&' はパラメータ区切り, '\0' は文字列終端)
+		if (firstByteOfChar == '&' || firstByteOfChar == '\0')
 		{
-			UECSbuffer[startPos + i] = '*';
+			break; // Node Name の入力はここまで
 		}
 
-		if (UECSbuffer[startPos + i] == '&')
-		{
-			break;
-		}
-		if (UECSbuffer[startPos + i] == '\0' || i == 19)
-		{
-			return;
-		} // �I�[�������̂Ŗ���
-		// prevention of Cutting multibyte UTF-8 code
-		if (i >= 16 && (unsigned char)UECSbuffer[startPos + i] >= 0xC0) // UTF-8 multibyte code header
-		{
+		unsigned char c = (unsigned char)firstByteOfChar;
+		int charLen = 0; // このUTF-8文字のバイト長
 
-			break;
+		// HTMLタグ文字は '*' に置換
+		if (c == '<' || c == '>')
+		{
+			if (currentNodeNameBytes < maxNodeNameBytes)
+			{ // バッファに空きがあれば '*' を追加
+				U_nodename[currentNodeNameBytes++] = '*';
+			}
+			bufferIdx++; // 1バイト進めて次の入力文字へ
+			continue;	 // ループの先頭へ
 		}
 
-		UECStempStr20[i] = UECSbuffer[startPos + i];
+		// UTF-8のバイト長を判定
+		if (c < 0x80)
+		{
+			charLen = 1;
+		} // 1-byte character (ASCII)
+		else if ((c & 0xE0) == 0xC0)
+		{
+			charLen = 2;
+		} // 2-byte character
+		else if ((c & 0xF0) == 0xE0)
+		{
+			charLen = 3;
+		} // 3-byte character
+		else if ((c & 0xF8) == 0xF0)
+		{
+			charLen = 4;
+		} // 4-byte character
+		else
+		{ // 不正なUTF-8開始バイト
+			if (currentNodeNameBytes < maxNodeNameBytes)
+			{ // バッファに空きがあれば '*' を追加
+				U_nodename[currentNodeNameBytes++] = '*';
+			}
+			bufferIdx++; // 1バイト進めて次の入力文字へ
+			continue;	 // ループの先頭へ
+		}
+
+		// 1. U_nodename にこの文字全体を格納するスペースがあるか確認
+		if (currentNodeNameBytes + charLen > maxNodeNameBytes)
+		{
+			break; // スペースがないので、この文字は追加せず終了
+		}
+
+		// 2. 有効なUTF-8シーケンスか、かつ入力バッファに十分なデータがあるか確認
+		bool valid_sequence = true;
+		// 継続バイトのチェック (charLen > 1 の場合) とバッファ終端チェック
+		for (int k = 1; k < charLen; ++k)
+		{ // 2バイト目以降を確認
+			char byte_in_seq = UECSbuffer[startPos + bufferIdx + k];
+			if (byte_in_seq == '&' || byte_in_seq == '\0' || ((unsigned char)byte_in_seq & 0xC0) != 0x80)
+			{
+				valid_sequence = false; // 不正な継続バイトまたは入力の早期終端
+				break;
+			}
+		}
+
+		if (valid_sequence)
+		{ // 有効なUTF-8文字の場合
+			memcpy(&U_nodename[currentNodeNameBytes], &UECSbuffer[startPos + bufferIdx], charLen);
+			currentNodeNameBytes += charLen;
+		}
+		else
+		{ // 不正なUTF-8シーケンス、または途中で入力が途切れた場合
+			if (currentNodeNameBytes < maxNodeNameBytes)
+			{ // バッファに空きがあれば '*' を追加
+				U_nodename[currentNodeNameBytes++] = '*';
+			}
+			// 不正な文字や不完全な文字の場合、charLen分進めてエラーとして処理されたものとして扱う
+			// (charLenの判定自体は最初のバイトで行われるため、最大でも4バイト進む)
+		}
+		bufferIdx += charLen; // 処理した(またはエラーとして扱った)文字のバイト数だけ進める
 	}
+	U_nodename[currentNodeNameBytes] = '\0'; // 最後にヌル終端文字を確実に設定
 
-	UECStempStr20[i] = '\0'; // set end code
-
-	for (int i = 0; i < 20; i++)
+	// EEPROMへの保存 (U_nodename のサイズに合わせてループ)
+	for (int k = 0; k < sizeof(U_nodename); k++)
 	{
-		UECS_EEPROM_writeChar(EEPROM_NODENAME + i, UECStempStr20[i]); // save to EEPROM
-		if (UECStempStr20[i] == '\0')
-		{
-			break;
-		} // end code
+		UECS_EEPROM_writeChar(EEPROM_NODENAME + k, U_nodename[k]); // U_nodename の内容をEEPROMに保存
+		if (U_nodename[k] == '\0')
+		{ // ヌル終端文字を書き込んだら
+			// EEPROMの残りの領域をヌル文字で埋める (以前の長い名前が残らないようにするため)
+			for (int l = k + 1; l < sizeof(U_nodename); ++l)
+			{
+				if (EEPROM.read(EEPROM_NODENAME + l) != '\0')
+				{ // 既にヌルでなければ書き込む
+					UECS_EEPROM_writeChar(EEPROM_NODENAME + l, '\0');
+				}
+			}
+			break; // ループを抜ける
+		}
 	}
-
 	return;
 }
 
@@ -1732,7 +1808,7 @@ void UECSCheckProgramUpdate()
 
 //--------------------------------------------------------------
 void UECS_EEPROM_SaveCCMType(int ccmid)
-{	
+{
 	if (ccmid * EEPROM_L_CCM_TOTAL + EEPROM_L_CCM_TOTAL > EEPROM_CCMEND)
 	{
 		return;
