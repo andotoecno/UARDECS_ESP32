@@ -299,7 +299,7 @@ const char UECShtmlLAN3E[] PROGMEM ="mac:";
 const char UECShtmlUECSID[] PROGMEM ="<BR>uecsid:";
 const char UECShtmlLANTITLE[] PROGMEM = "LAN";
 const char UECShtmlUECSTITLE[] PROGMEM = "UECS";
-const char UECShtmlNAMETITLE[] PROGMEM = "Node Name";
+const char UECShtmlNAMETITLE[] PROGMEM = "Node Name (英 24文字, 日 8文字)";
 
 const char UECShtmlATTENTION_RESET[] PROGMEM = "Please push reset button.";
 
