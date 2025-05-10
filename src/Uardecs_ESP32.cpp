@@ -868,7 +868,7 @@ void HTTPsendPageCCM()
 			}
 
 			HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
-			HTTPAddPGMCharToBuffer(U_ccmList[i].type);
+			HTTPAddCharToBuffer(U_ccmList[i].typeStr);
 			HTTPAddPGMCharToBuffer(&(UECStdtd[0])); //</td><td>
 
 			HTTPAddPGMCharToBuffer((UECSCCMLEVEL[U_ccmList[i].ccmLevel])); //******
@@ -1732,13 +1732,11 @@ void UECSCheckProgramUpdate()
 
 //--------------------------------------------------------------
 void UECS_EEPROM_SaveCCMType(int ccmid)
-{
-#if defined(_ARDUINIO_MEGA_SETTING)
+{	
 	if (ccmid * EEPROM_L_CCM_TOTAL + EEPROM_L_CCM_TOTAL > EEPROM_CCMEND)
 	{
 		return;
 	} // out of memory
-#endif
 
 	int i;
 	// type��������
@@ -1791,12 +1789,10 @@ void UECS_EEPROM_SaveCCMAttribute(int ccmid)
 //--------------------------------------------------------------
 void UECS_EEPROM_LoadCCMSetting(int ccmid)
 {
-#if defined(_ARDUINIO_MEGA_SETTING)
 	if (ccmid * EEPROM_L_CCM_TOTAL + EEPROM_L_CCM_TOTAL > EEPROM_CCMEND)
 	{
 		return;
 	} // out of memory
-#endif
 
 	int i;
 	for (i = 0; i < MAX_CCMTYPESIZE; i++)
