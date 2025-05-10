@@ -605,25 +605,29 @@ void UECSautomaticValidManager(unsigned long td)
 
 // ##############################################################################
 // ##############################################################################
-void UECS_EEPROM_writeByte(int ee, uint8_t value)
+bool UECS_EEPROM_writeByte(int ee, uint8_t value)
 {
 	if (EEPROM.read(ee) != (uint8_t)value) // skip same value
 	{
 		EEPROM.write(ee, (uint8_t)value);
 		EEPROM.commit(); // Commit immediately after a change for a single byte
+		return true;
 	}
+	return false;
 }
 
-void UECS_EEPROM_writeChar(int ee, char value)
+bool UECS_EEPROM_writeChar(int ee, char value)
 {
 	if (EEPROM.read(ee) != value) // skip same value
 	{
 		EEPROM.write(ee, value);
 		EEPROM.commit(); // Commit immediately after a change for a single char
+		return true;
 	}
+	return false;
 }
 
-void UECS_EEPROM_writeLong(int ee, long value)
+bool UECS_EEPROM_writeLong(int ee, long value)
 {
 	int skip_counter = 0;
 	byte *p = (byte *)(void *)&value;
@@ -641,7 +645,9 @@ void UECS_EEPROM_writeLong(int ee, long value)
 	if (skip_counter < sizeof(value))
 	{
 		EEPROM.commit();
+		return true;
 	}
+	return false;
 }
 
 uint8_t UECS_EEPROM_readByte(int ee)
@@ -662,7 +668,6 @@ long UECS_EEPROM_readLong(int ee)
 		*p++ = EEPROM.read(ee++);
 	return value;
 }
-
 
 //-----------------------------------------------------------new
 void HTTPsetInput(short _value)
@@ -1387,6 +1392,7 @@ void HTTPGetFormDataLANSettingPage()
 	long UECStempValue[16];
 	unsigned char tempDecimal;
 	int skip_counter = 0;
+	bool saved_flag = false;
 	//
 	// MYIP      4
 	// SUBNET    4
@@ -1426,9 +1432,10 @@ void HTTPGetFormDataLANSettingPage()
 
 	for (int i = 0; i < 16; i++)
 	{
-		UECS_EEPROM_writeLong(EEPROM_DATATOP + i, UECStempValue[i]); // save to EEPROM
+		saved_flag = UECS_EEPROM_writeLong(EEPROM_DATATOP + i, UECStempValue[i]); // save to EEPROM
+		if (saved_flag)
+			U_orgAttribute.status |= STATUS_NEEDRESET;
 	}
-	
 
 	//---------------------------NODE NAME
 	if (!UECSFindPGMChar(&UECSbuffer[startPos], UECSaccess_LEQUAL, &progPos))
@@ -1754,7 +1761,6 @@ void UECS_EEPROM_SaveCCMAttribute(int ccmid)
 	{
 		return;
 	} // out of memory
-
 
 	if (UECS_EEPROM_readByte(ccmid * EEPROM_L_CCM_TOTAL + EEPROM_CCMTOP + EEPROM_L_CCM_ROOM) != (unsigned char)(U_ccmList[ccmid].baseAttribute[AT_ROOM]))
 	{

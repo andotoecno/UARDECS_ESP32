@@ -409,9 +409,9 @@ void UECSresetWiFi();
 void UECSStartServer();
 void SoftReset(void);
 
-void UECS_EEPROM_writeLong(int ee, long value);
-void UECS_EEPROM_writeChar(int ee, char value);
-void UECS_EEPROM_writeByte(int ee, uint8_t value);
+bool UECS_EEPROM_writeLong(int ee, long value);
+bool UECS_EEPROM_writeChar(int ee, char value);
+bool UECS_EEPROM_writeByte(int ee, uint8_t value);
 long UECS_EEPROM_readLong(int ee);
 char UECS_EEPROM_readChar(int ee);
 uint8_t UECS_EEPROM_readByte(int ee);
