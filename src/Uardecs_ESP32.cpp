@@ -932,6 +932,10 @@ void HTTPsendPageCCM()
 
 	HTTPAddPGMCharToBuffer(&(UECShtmlTABLECLOSE[0])); //</TBODY></TABLE>
 
+	// Update web value
+	OnWebFormRecieved();
+
+	// Show web value
 	if (U_HtmlLine > 0)
 	{
 		HTTPAddPGMCharToBuffer(&(UECShtmlUserRes0[0])); // </H1><H2>Status</H2><TABLE border=\"1\"><TBODY align=\"center\"><TR><TH>Name</TH><TH>Val</TH><TH>Unit</TH><TH>Detail</TH></TR>
@@ -1006,7 +1010,7 @@ void HTTPsendPageCCM()
 	}
 	HTTPAddPGMCharToBuffer(&(UECShtmlRETURNINDEX[0])); //<P align=\"center\">return <A href=\"index.htm\">Top</A></P>
 	HTTPAddPGMCharToBuffer(&(UECShtmlHTMLCLOSE[0]));
-
+	
 	HTTPCloseBuffer();
 }
 
@@ -1618,12 +1622,12 @@ void HTTPcheckRequest()
 				Serial.println(UECSbuffer);
 
 				int progPos = 0;
-				// Top Page
-
+				
 				if (UECSFindPGMChar(UECSbuffer, &(UECSpageFavicon[0]), &progPos))
 				{
 					HTTPsendFaviconResponse();
 				}
+				// Top Page
 				else if (UECSFindPGMChar(UECSbuffer, &(UECSaccess_NOSPC_GETP0[0]), &progPos))
 				{
 					HTTPsendPageIndex();
