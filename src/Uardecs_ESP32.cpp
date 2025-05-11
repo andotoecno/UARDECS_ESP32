@@ -1763,11 +1763,10 @@ void UECSsetup()
 {
 	EEPROM.begin(EEPROM_DATAEND);
 
-	UECSCheckProgramUpdate();
-	delay(3000);
-
+	UECSCheckProgramUpdate();	
 	pinMode(U_InitPin, INPUT_PULLUP);
 	Serial.begin(115200);
+	delay(1000);
 
 	if (digitalRead(U_InitPin) == U_InitPin_Sense || UECS_EEPROM_readLong(EEPROM_IP) == -1)
 	{
