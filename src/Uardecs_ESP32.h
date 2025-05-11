@@ -8,8 +8,8 @@
 
 */
 
-#ifndef Uardecs_h
-#define Uardecs_h
+#ifndef UARDECS_ESP32_H
+#define UARDECS_ESP32_H
 
 #include <WiFi.h>
 #include <AsyncUDP.h>
