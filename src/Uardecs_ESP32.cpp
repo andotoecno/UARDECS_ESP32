@@ -845,6 +845,8 @@ void HTTPsendPageLANSetting()
 
 void HTTPsendPageCCM()
 {
+	// Update web value
+	OnWebFormRecieved();
 
 	HTTPPrintHeader();
 	HTTPAddCharToBuffer(U_nodename);
@@ -931,9 +933,6 @@ void HTTPsendPageCCM()
 	}
 
 	HTTPAddPGMCharToBuffer(&(UECShtmlTABLECLOSE[0])); //</TBODY></TABLE>
-
-	// Update web value
-	OnWebFormRecieved();
 
 	// Show web value
 	if (U_HtmlLine > 0)
@@ -1217,8 +1216,10 @@ void HTTPGetFormDataCCMPage()
 		}
 	}
 
+	// Get web value
 	OnWebFormRecieved();
 
+	// Save web value
 	for (i = 0; i < U_HtmlLine; i++)
 	{
 		UECS_EEPROM_writeLong(EEPROM_WEBDATA + i * 4, *(U_html[i].data));
