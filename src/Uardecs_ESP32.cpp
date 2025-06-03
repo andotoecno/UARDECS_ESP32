@@ -2065,10 +2065,10 @@ void UECSinitOrgAttribute()
 	}
 
 	// reset web form
-	for (int i = 0; i < U_HtmlLine; i++)
-	{
-		*(U_html[i].data) = U_html[i].minValue;
-	}
+	// for (int i = 0; i < U_HtmlLine; i++)
+	// {
+	// 	*(U_html[i].data) = U_html[i].minValue;
+	// }
 
 	// U_orgAttribute.room = UECS_EEPROM_readByte(EEPROM_OFFSET_ROOM);
 	// U_orgAttribute.region = UECS_EEPROM_readByte(EEPROM_OFFSET_REGION);
