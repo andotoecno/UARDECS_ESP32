@@ -340,6 +340,7 @@ const char UECSpageError[] PROGMEM = "Error!";
 const char UECShtmlIndex[] PROGMEM = "<a href=\"./1\">Node Status</a><br><br><a href=\"./3?L=0\">CCM Edit</a><br><br><a href=\"./2\">Network Config</a><br>";
 
 const char UECShtmlUserRes0[] PROGMEM="<H2>Status & SetValue</H2><form action=\"./1\"><TABLE border=\"1\"><TBODY align=\"center\"><TR><TH>Name</TH><TH>Val</TH><TH>Unit</TH><TH>Detail</TH></TR>";
+const char UECShtmlUserRes0_SAFEMODE[] PROGMEM="<H2>Status & SetValue (Default values are used in Safe Mode)</H2><form action=\"./1\"><TABLE border=\"1\"><TBODY align=\"center\"><TR><TH>Name</TH><TH>Val</TH><TH>Unit</TH><TH>Detail</TH></TR>";
 const char UECShtmlInputHidden0[] PROGMEM = "<INPUT type=\"hidden\" name=\"L\" value=\"0\"/>";
 const char UECShtmlInputHiddenValue[] PROGMEM = "<INPUT type=\"hidden\" name=\"L\" value=\"";
 

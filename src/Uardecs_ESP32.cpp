@@ -937,8 +937,14 @@ void HTTPsendPageCCM()
 	// Show web value
 	if (U_HtmlLine > 0)
 	{
-		HTTPAddPGMCharToBuffer(&(UECShtmlUserRes0[0])); // </H1><H2>Status</H2><TABLE border=\"1\"><TBODY align=\"center\"><TR><TH>Name</TH><TH>Val</TH><TH>Unit</TH><TH>Detail</TH></TR>
-
+		if (U_orgAttribute.status & STATUS_SAFEMODE)
+		{
+			HTTPAddPGMCharToBuffer(&(UECShtmlUserRes0_SAFEMODE[0]));
+		}
+		else
+		{
+			HTTPAddPGMCharToBuffer(&(UECShtmlUserRes0[0])); // </H1><H2>Status</H2><TABLE border=\"1\"><TBODY align=\"center\"><TR><TH>Name</TH><TH>Val</TH><TH>Unit</TH><TH>Detail</TH></TR>
+		}
 		for (int i = 0; i < U_HtmlLine; i++)
 		{
 
@@ -1009,7 +1015,7 @@ void HTTPsendPageCCM()
 	}
 	HTTPAddPGMCharToBuffer(&(UECShtmlRETURNINDEX[0])); //<P align=\"center\">return <A href=\"index.htm\">Top</A></P>
 	HTTPAddPGMCharToBuffer(&(UECShtmlHTMLCLOSE[0]));
-	
+
 	HTTPCloseBuffer();
 }
 
@@ -1623,7 +1629,7 @@ void HTTPcheckRequest()
 				Serial.println(UECSbuffer);
 
 				int progPos = 0;
-				
+
 				if (UECSFindPGMChar(UECSbuffer, &(UECSpageFavicon[0]), &progPos))
 				{
 					HTTPsendFaviconResponse();
@@ -1763,7 +1769,7 @@ void UECSsetup()
 {
 	EEPROM.begin(EEPROM_DATAEND);
 
-	UECSCheckProgramUpdate();	
+	UECSCheckProgramUpdate();
 	pinMode(U_InitPin, INPUT_PULLUP);
 	Serial.begin(115200);
 	delay(1000);
