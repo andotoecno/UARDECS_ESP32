@@ -1932,6 +1932,7 @@ void UECSStartServer()
 void UECSSetWiFiConfig()
 {
 	/*MAC address*/
+	char mac[50], ip[50], gateway[50], subnet[50];
 	uint8_t mac_buf[6];
 	esp_read_mac(mac_buf, ESP_MAC_WIFI_STA);
 	U_orgAttribute.mac[0] = mac_buf[0];
@@ -1940,13 +1941,17 @@ void UECSSetWiFiConfig()
 	U_orgAttribute.mac[3] = mac_buf[3];
 	U_orgAttribute.mac[4] = mac_buf[4];
 	U_orgAttribute.mac[5] = mac_buf[5];
-
+	sprintf(mac, "%S%02X:%02X:%02X:%02X:%02X:%02X", "MAC\t\t", U_orgAttribute.mac[0], U_orgAttribute.mac[1], U_orgAttribute.mac[2], U_orgAttribute.mac[3], U_orgAttribute.mac[4], U_orgAttribute.mac[5]);
+	
 	if (U_orgAttribute.status & STATUS_SAFEMODE)
 	{
 		if (!WiFi.config(default_ip, default_gateway, default_subnet, default_dns))
 		{ // ip,gateway,subnet,dns
 			Serial.println("Failed to configure of WiFi for safe mode");
 		}
+		sprintf(ip, "%S%d.%d.%d.%d", "SAFE IP\t\t", default_ip[0], default_ip[1], default_ip[2], default_ip[3]);
+		sprintf(gateway, "%S%d.%d.%d.%d", "SAFE GateWay\t", default_gateway[0], default_gateway[1], default_gateway[2], default_gateway[3]);
+		sprintf(subnet, "%S%d.%d.%d.%d", "SAFE Subnet\t", default_subnet[0], default_subnet[1], default_subnet[2], default_subnet[3]);
 	}
 	else
 	{
@@ -1954,7 +1959,14 @@ void UECSSetWiFiConfig()
 		{ // ip,gateway,subnet,dns
 			Serial.println("Failed to configure of WiFi");
 		}
+		sprintf(ip, "%S%d.%d.%d.%d", "CCM IP\t\t", U_orgAttribute.ip[0], U_orgAttribute.ip[1], U_orgAttribute.ip[2], U_orgAttribute.ip[3]);
+		sprintf(gateway, "%S%d.%d.%d.%d", "CCM GateWay\t", U_orgAttribute.gateway[0], U_orgAttribute.gateway[1], U_orgAttribute.gateway[2], U_orgAttribute.gateway[3]);
+		sprintf(subnet, "%S%d.%d.%d.%d", "CCM Subnet\t", U_orgAttribute.subnet[0], U_orgAttribute.subnet[1], U_orgAttribute.subnet[2], U_orgAttribute.subnet[3]);
 	}
+	Serial.println(mac);
+	Serial.println(ip);
+	Serial.println(gateway);
+	Serial.println(subnet);
 
 	// WiFi.begin(WiFi_SSID, WiFi_PASS);
 	// Serial.println("WiFi SSID: " + String(WiFi_SSID));
@@ -1966,17 +1978,6 @@ void UECSSetWiFiConfig()
 	// 	Serial.println("WiFi connecting...");
 	// }
 	// Serial.println("WiFi connected");
-
-	char mac[50], ip[50], gateway[50], subnet[50];
-	sprintf(mac, "%S%02X:%02X:%02X:%02X:%02X:%02X", "MAC\t\t\t", U_orgAttribute.mac[0], U_orgAttribute.mac[1], U_orgAttribute.mac[2], U_orgAttribute.mac[3], U_orgAttribute.mac[4], U_orgAttribute.mac[5]);
-	Serial.println(mac);
-
-	sprintf(ip, "%S%d.%d.%d.%d", "CCM IP\t", U_orgAttribute.ip[0], U_orgAttribute.ip[1], U_orgAttribute.ip[2], U_orgAttribute.ip[3]);
-	sprintf(gateway, "%S%d.%d.%d.%d", "CCM GateWay\t", U_orgAttribute.gateway[0], U_orgAttribute.gateway[1], U_orgAttribute.gateway[2], U_orgAttribute.gateway[3]);
-	sprintf(subnet, "%S%d.%d.%d.%d", "CCM Subnet\t", U_orgAttribute.subnet[0], U_orgAttribute.subnet[1], U_orgAttribute.subnet[2], U_orgAttribute.subnet[3]);
-	Serial.println(ip);
-	Serial.println(gateway);
-	Serial.println(subnet);
 }
 //---------------------------------------------------------
 void UECSresetWiFi()
