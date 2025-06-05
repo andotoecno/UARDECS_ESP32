@@ -1971,9 +1971,9 @@ void UECSSetWiFiConfig()
 	sprintf(mac, "%S%02X:%02X:%02X:%02X:%02X:%02X", "MAC\t\t\t", U_orgAttribute.mac[0], U_orgAttribute.mac[1], U_orgAttribute.mac[2], U_orgAttribute.mac[3], U_orgAttribute.mac[4], U_orgAttribute.mac[5]);
 	Serial.println(mac);
 
-	sprintf(ip, "%S%d.%d.%d.%d", "MCC IP\t", U_orgAttribute.ip[0], U_orgAttribute.ip[1], U_orgAttribute.ip[2], U_orgAttribute.ip[3]);
-	sprintf(gateway, "%S%d.%d.%d.%d", "MCC GateWay\t", U_orgAttribute.gateway[0], U_orgAttribute.gateway[1], U_orgAttribute.gateway[2], U_orgAttribute.gateway[3]);
-	sprintf(subnet, "%S%d.%d.%d.%d", "MCC Subnet\t", U_orgAttribute.subnet[0], U_orgAttribute.subnet[1], U_orgAttribute.subnet[2], U_orgAttribute.subnet[3]);
+	sprintf(ip, "%S%d.%d.%d.%d", "CCM IP\t", U_orgAttribute.ip[0], U_orgAttribute.ip[1], U_orgAttribute.ip[2], U_orgAttribute.ip[3]);
+	sprintf(gateway, "%S%d.%d.%d.%d", "CCM GateWay\t", U_orgAttribute.gateway[0], U_orgAttribute.gateway[1], U_orgAttribute.gateway[2], U_orgAttribute.gateway[3]);
+	sprintf(subnet, "%S%d.%d.%d.%d", "CCM Subnet\t", U_orgAttribute.subnet[0], U_orgAttribute.subnet[1], U_orgAttribute.subnet[2], U_orgAttribute.subnet[3]);
 	Serial.println(ip);
 	Serial.println(gateway);
 	Serial.println(subnet);
