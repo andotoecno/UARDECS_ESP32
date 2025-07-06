@@ -1,13 +1,15 @@
-## Uardecs_ESP32
-- [UARDECS](https://uecs.org/arduino/uardecs.html)をESP32のWiFiで使えるように移植したライブラリです。使い方はUARDECSと同じです。
-  - mainブランチにはArduino Uno版を移植し、試験的にMega版を[future/mega_imigration](https://github.com/andotoecno/UARDECS_ESP32/tree/feature/mega-imigration)ブランチに移植しています。
-- 以下の動作確認済みです。
-    - ブラウザからノードの設定を見に行き、IPアドレス等を更新。
-    - UECSパケット送受信支援ツールでUDPが来ているのを確認。
-    - UECS-GEARでテストデータの受信を確認。
-    - UECS-Pi, Arsprout Piでの受信確認。
-- 実装の詳細や移植時のメモは[README_dev.md](README_dev.md)を参照してください。
+## Uardecs\_ESP32
+[日本語版はこちら](https://github.com/andotoecno/UARDECS_ESP32/README_jp.md)
+  - This is a library that ports [UARDECS](https://uecs.org/arduino/uardecs.html) to be used with the ESP32's WiFi. It can be used in the same way as the original UARDECS.
+      - The `main` branch contains a port of the Arduino Uno version, and a port of the Mega version is being tested on the `feature/mega-imigration` branch.
+  - The following operations have been confirmed:
+      - Viewing node settings from a browser and updating IP addresses, etc.
+      - Confirming UDP packet reception with the UECS Packet Send/Receive Support Tool.
+      - Confirming reception of test data with UECS-GEAR.
+      - Confirming reception with UECS-Pi and Arsprout Pi.
+  - For implementation details and porting notes, please refer to [README\_dev.md](https://www.google.com/search?q=README_dev.md).
 
-## ライセンス
-- [MITライセンス](https://opensource.org/licenses/MIT)に基づいています。
-- 詳細は[LICENSE](LICENSE)を参照してください。
+## License
+
+  - This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+  - See [LICENSE](https://www.google.com/search?q=LICENSE) for more details.
