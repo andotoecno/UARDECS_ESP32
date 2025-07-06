@@ -5,7 +5,7 @@
 ## 概要
 
 - **mainブランチ**: Arduino Uno版の移植です。
-- **feature/mega-imigrationブランチ**: 試験的なMega版の移植です。
+- **feature/mega-imigrationブランチ**: Mega版の移植です。
 
 ---
 
